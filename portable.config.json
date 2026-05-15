@@ -1,0 +1,14 @@
+{
+"name": "mamabot-portable",
+"version": "0.1.0",
+"port": 3200,
+"mode": "portable",
+"runtime": {
+"cliRoot": "runtime/cli",
+"cacheRoot": "runtime/cache"
+},
+"workspace": {
+"createHermesWorkspace": true,
+"workspaceFolderName": ".hermes-workspace"
+}
+}

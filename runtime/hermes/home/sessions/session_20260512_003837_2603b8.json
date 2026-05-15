@@ -1,0 +1,1051 @@
+{
+  "session_id": "20260512_003837_2603b8",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "base_url": "https://openrouter.ai/api/v1",
+  "platform": "cli",
+  "session_start": "2026-05-12T00:38:37.170623",
+  "last_updated": "2026-05-12T00:41:36.890541",
+  "system_prompt": "# Hermes Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\nThe agent will embody whatever you write here.\nEdit this to customize how Hermes communicates with you.\n\nExamples:\n  - \"You are a warm, playful assistant who uses kaomoji occasionally.\"\n  - \"You are a concise technical expert. No fluff, just facts.\"\n  - \"You speak like a friendly coworker who happens to know everything.\"\n\nThis file is loaded fresh each message -- no restart needed.\nDelete the contents (or this file) to use the default personality.\n-->\n\nIf the user asks about configuring, setting up, or using Hermes Agent itself, load the `hermes-agent` skill with skill_view(name='hermes-agent') before answering. Docs: https://hermes-agent.nousresearch.com/docs\n\nYou have persistent memory across sessions. Save durable facts using the memory tool: user preferences, environment details, tool quirks, and stable conventions. Memory is injected into every turn, so keep it compact and focused on facts that will still matter later.\nPrioritize what reduces future user steering — the most valuable memory is one that prevents the user from having to correct or remind you again. User preferences and recurring corrections matter more than procedural task details.\nDo NOT save task progress, session outcomes, completed-work logs, or temporary TODO state to memory; use session_search to recall those from past transcripts. Specifically: do not record PR numbers, issue numbers, commit SHAs, 'fixed bug X', 'submitted PR Y', 'Phase N done', file counts, or any artifact that will be stale in 7 days. If a fact will be stale in a week, it does not belong in memory. If you've discovered a new way to do something, solved a problem that could be necessary later, save it as a skill with the skill tool.\nWrite memories as declarative facts, not instructions to yourself. 'User prefers concise responses' ✓ — 'Always respond concisely' ✗. 'Project uses pytest with xdist' ✓ — 'Run tests with pytest -n 4' ✗. Imperative phrasing gets re-read as a directive in later sessions and can cause repeated work or override the user's current request. Procedures and workflows belong in skills, not memory. When the user references something from a past conversation or you suspect relevant cross-session context exists, use session_search to recall it before asking them to repeat themselves. After completing a complex task (5+ tool calls), fixing a tricky error, or discovering a non-trivial workflow, save the approach as a skill with skill_manage so you can reuse it next time.\nWhen using a skill and finding it outdated, incomplete, or wrong, patch it immediately with skill_manage(action='patch') — don't wait to be asked. Skills that aren't maintained become liabilities.\n\n## Skills (mandatory)\nBefore replying, scan the skills below. If a skill matches or is even partially relevant to your task, you MUST load it with skill_view(name) and follow its instructions. Err on the side of loading — it is always better to have context you don't need than to miss critical steps, pitfalls, or established workflows. Skills contain specialized knowledge — API endpoints, tool-specific commands, and proven workflows that outperform general-purpose approaches. Load the skill even if you think you could handle the task with basic tools like web_search or terminal. Skills also encode the user's preferred approach, conventions, and quality standards for tasks like code review, planning, and testing — load them even for tasks you already know how to do, because the skill defines how it should be done here.\nWhenever the user asks you to configure, set up, install, enable, disable, modify, or troubleshoot Hermes Agent itself — its CLI, config, models, providers, tools, skills, voice, gateway, plugins, or any feature — load the `hermes-agent` skill first. It has the actual commands (e.g. `hermes config set …`, `hermes tools`, `hermes setup`) so you don't have to guess or invent workarounds.\nIf a skill has issues, fix it with skill_manage(action='patch').\nAfter difficult/iterative tasks, offer to save as a skill. If a skill you loaded was missing steps, had wrong commands, or needed pitfalls you discovered, update it before finishing.\n\n<available_skills>\n  autonomous-ai-agents: Skills for spawning and orchestrating autonomous AI coding agents and multi-agent workflows — running independent agent processes, delegating tasks, and coordinating parallel workstreams.\n    - claude-code: Delegate coding to Claude Code CLI (features, PRs).\n    - codex: Delegate coding to OpenAI Codex CLI (features, PRs).\n    - hermes-agent: Configure, extend, or contribute to Hermes Agent.\n    - opencode: Delegate coding to OpenCode CLI (features, PR review).\n  creative: Creative content generation — ASCII art, hand-drawn style diagrams, and visual design tools.\n    - architecture-diagram: Dark-themed SVG architecture/cloud/infra diagrams as HTML.\n    - ascii-art: ASCII art: pyfiglet, cowsay, boxes, image-to-ascii.\n    - ascii-video: ASCII video: convert video/audio to colored ASCII MP4/GIF.\n    - baoyu-comic: Knowledge comics (知识漫画): educational, biography, tutorial.\n    - baoyu-infographic: Infographics: 21 layouts x 21 styles (信息图, 可视化).\n    - claude-design: Design one-off HTML artifacts (landing, deck, prototype).\n    - comfyui: Generate images, video, and audio with ComfyUI — install,...\n    - design-md: Author/validate/export Google's DESIGN.md token spec files.\n    - excalidraw: Hand-drawn Excalidraw JSON diagrams (arch, flow, seq).\n    - humanizer: Humanize text: strip AI-isms and add real voice.\n    - ideation: Generate project ideas via creative constraints.\n    - manim-video: Manim CE animations: 3Blue1Brown math/algo videos.\n    - p5js: p5.js sketches: gen art, shaders, interactive, 3D.\n    - pixel-art: Pixel art w/ era palettes (NES, Game Boy, PICO-8).\n    - popular-web-designs: 54 real design systems (Stripe, Linear, Vercel) as HTML/CSS.\n    - pretext: Use when building creative browser demos with @chenglou/p...\n    - sketch: Throwaway HTML mockups: 2-3 design variants to compare.\n    - songwriting-and-ai-music: Songwriting craft and Suno AI music prompts.\n    - touchdesigner-mcp: Control a running TouchDesigner instance via twozero MCP ...\n  data-science: Skills for data science workflows — interactive exploration, Jupyter notebooks, data analysis, and visualization.\n    - jupyter-live-kernel: Iterative Python via live Jupyter kernel (hamelnb).\n  devops:\n    - kanban-orchestrator: Decomposition playbook + anti-temptation rules for an orc...\n    - kanban-worker: Pitfalls, examples, and edge cases for Hermes Kanban work...\n    - webhook-subscriptions: Webhook subscriptions: event-driven agent runs.\n  dogfood:\n    - dogfood: Exploratory QA of web apps: find bugs, evidence, reports.\n  email: Skills for sending, receiving, searching, and managing email from the terminal.\n    - himalaya: Himalaya CLI: IMAP/SMTP email from terminal.\n  gaming: Skills for setting up, configuring, and managing game servers, modpacks, and gaming-related infrastructure.\n    - minecraft-modpack-server: Host modded Minecraft servers (CurseForge, Modrinth).\n    - pokemon-player: Play Pokemon via headless emulator + RAM reads.\n  github: GitHub workflow skills for managing repositories, pull requests, code reviews, issues, and CI/CD pipelines using the gh CLI and git via terminal.\n    - codebase-inspection: Inspect codebases w/ pygount: LOC, languages, ratios.\n    - github-auth: GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login.\n    - github-code-review: Review PRs: diffs, inline comments via gh or REST.\n    - github-issues: Create, triage, label, assign GitHub issues via gh or REST.\n    - github-pr-workflow: GitHub PR lifecycle: branch, commit, open, CI, merge.\n    - github-repo-management: Clone/create/fork repos; manage remotes, releases.\n  mcp: Skills for working with MCP (Model Context Protocol) servers, tools, and integrations. Documents the built-in native MCP client — configure servers in config.yaml for automatic tool discovery.\n    - native-mcp: MCP client: connect servers, register tools (stdio/HTTP).\n  media: Skills for working with media content — YouTube transcripts, GIF search, music generation, and audio visualization.\n    - gif-search: Search/download GIFs from Tenor via curl + jq.\n    - heartmula: HeartMuLa: Suno-like song generation from lyrics + tags.\n    - songsee: Audio spectrograms/features (mel, chroma, MFCC) via CLI.\n    - spotify: Spotify: play, search, queue, manage playlists and devices.\n    - youtube-content: YouTube transcripts to summaries, threads, blogs.\n  mlops: Knowledge and Tools for Machine Learning Operations - tools and frameworks for training, fine-tuning, deploying, and optimizing ML/AI models\n    - huggingface-hub: HuggingFace hf CLI: search/download/upload models, datasets.\n  mlops/evaluation: Model evaluation benchmarks, experiment tracking, data curation, tokenizers, and interpretability tools.\n    - evaluating-llms-harness: lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.).\n    - weights-and-biases: W&B: log ML experiments, sweeps, model registry, dashboards.\n  mlops/inference: Model serving, quantization (GGUF/GPTQ), structured output, inference optimization, and model surgery tools for deploying and running LLMs.\n    - llama-cpp: llama.cpp local GGUF inference + HF Hub model discovery.\n    - obliteratus: OBLITERATUS: abliterate LLM refusals (diff-in-means).\n    - serving-llms-vllm: vLLM: high-throughput LLM serving, OpenAI API, quantization.\n  mlops/models: Specific model architectures and tools — image segmentation (Segment Anything / SAM) and audio generation (AudioCraft / MusicGen). Additional model skills (CLIP, Stable Diffusion, Whisper, LLaVA) are available as optional skills.\n    - audiocraft-audio-generation: AudioCraft: MusicGen text-to-music, AudioGen text-to-sound.\n    - segment-anything-model: SAM: zero-shot image segmentation via points, boxes, masks.\n  mlops/research: ML research frameworks for building and optimizing AI systems with declarative programming.\n    - dspy: DSPy: declarative LM programs, auto-optimize prompts, RAG.\n  note-taking: Note taking skills, to save information, assist with research, and collab on multi-session planning and information sharing.\n    - obsidian: Read, search, create, and edit notes in the Obsidian vault.\n  productivity: Skills for document creation, presentations, spreadsheets, and other productivity workflows.\n    - airtable: Airtable REST API via curl. Records CRUD, filters, upserts.\n    - google-workspace: Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python.\n    - linear: Linear: manage issues, projects, teams via GraphQL + curl.\n    - maps: Geocode, POIs, routes, timezones via OpenStreetMap/OSRM.\n    - nano-pdf: Edit PDF text/typos/titles via nano-pdf CLI (NL prompts).\n    - notion: Notion API via curl: pages, databases, blocks, search.\n    - ocr-and-documents: Extract text from PDFs/scans (pymupdf, marker-pdf).\n    - powerpoint: Create, read, edit .pptx decks, slides, notes, templates.\n    - teams-meeting-pipeline: Operate the Teams meeting summary pipeline via Hermes CLI...\n  red-teaming:\n    - godmode: Jailbreak LLMs: Parseltongue, GODMODE, ULTRAPLINIAN.\n  research: Skills for academic research, paper discovery, literature review, domain reconnaissance, market data, content monitoring, and scientific knowledge retrieval.\n    - arxiv: Search arXiv papers by keyword, author, category, or ID.\n    - blogwatcher: Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool.\n    - llm-wiki: Karpathy's LLM Wiki: build/query interlinked markdown KB.\n    - polymarket: Query Polymarket: markets, prices, orderbooks, history.\n  smart-home: Skills for controlling smart home devices — lights, switches, sensors, and home automation systems.\n    - openhue: Control Philips Hue lights, scenes, rooms via OpenHue CLI.\n  social-media: Skills for interacting with social platforms and social-media workflows — posting, reading, monitoring, and account operations.\n    - xurl: X/Twitter via xurl CLI: post, search, DM, media, v2 API.\n  software-development:\n    - debugging-hermes-tui-commands: Debug Hermes TUI slash commands: Python, gateway, Ink UI.\n    - hermes-agent-skill-authoring: Author in-repo SKILL.md: frontmatter, validator, structure.\n    - node-inspect-debugger: Debug Node.js via --inspect + Chrome DevTools Protocol CLI.\n    - plan: Plan mode: write markdown plan to .hermes/plans/, no exec.\n    - python-debugpy: Debug Python: pdb REPL + debugpy remote (DAP).\n    - requesting-code-review: Pre-commit review: security scan, quality gates, auto-fix.\n    - spike: Throwaway experiments to validate an idea before build.\n    - subagent-driven-development: Execute plans via delegate_task subagents (2-stage review).\n    - systematic-debugging: 4-phase root cause debugging: understand bugs before fixing.\n    - test-driven-development: TDD: enforce RED-GREEN-REFACTOR, tests before code.\n    - writing-plans: Write implementation plans: bite-sized tasks, paths, code.\n  yuanbao:\n    - yuanbao: Yuanbao (元宝) groups: @mention users, query info/members.\n</available_skills>\n\nOnly proceed without loading a skill if genuinely none are relevant to the task.\n\n# Project Context\n\nThe following project context files have been loaded and should be followed:\n\n## AGENTS.md\n\n# AGENTS.md — Mama AI 운영 규칙\n\n> 프로젝트: Multi AI Chat | 환경: Windows 11 / Node.js 24 / Next.js 14 / 포트 3100\n\n---\n\n## 안전 규칙\n\n- `NEXT_PUBLIC_` 접두어 API 키 절대 금지\n- 파괴적 명령어(`rm -rf`, `git push --force`)는 명시적 요청 없이 실행하지 않는다\n- 외부 작업(이메일, PR 생성, 트윗)은 승인 후에만\n\n## 작업 규칙\n\n1. **확인 먼저** — 수정 전 반드시 실제 파일을 읽는다. 기억에 의존하지 않는다.\n2. **파일명 검증** — 실제 파일명을 확인한다 (TTSSetup.jsx ≠ TtsSettings.jsx).\n3. **최소 수정** — 요청된 부분만 수정한다. 동작하는 코드는 건드리지 않는다.\n4. **실패 보고** — 실패하면 이유와 해결 방법을 명확히 보고한다.\n\n## 핵심 규칙\n\n| # | 규칙 |\n|---|------|\n| R01 | 파일 수정 전 `backup/` 에 타임스탬프 백업 필수 |\n| R02 | `app/api/` 모든 route.js 최상단: `export const runtime = \"nodejs\"` |\n| R03 | import 구문은 반드시 파일 최상단 |\n| R08 | API 키 클라이언트 노출 금지. 서버사이드(`app/api/`)에서만 |\n| R09 | 모든 fetch에 try-catch 필수. 에러는 한국어로 표시 |\n| R12 | `invalidateIndex()` 호출 금지. `saveSession()` / `searchSessions()` 사용 |\n| R14 | 한국어 질문→한국어 답변 |\n| R15 | 요청된 기능만 수정. 동작하는 코드 건드리지 않는다 |\n\n## 아키텍처\n\n```\n채팅  → /api/chat          → 직접 LLM API (16개 프로바이더)\n에이전트 → /api/agent/run  → OpenClaude CLI 브릿지 (child_process + SSE)\n백업  → /api/agent/backup  → backup/full/*.zip (7z)\n```\n\n## 프로바이더 환경변수 매핑\n\n> 변경 시 `chat/route.js(ENV_KEY_MAP)` + `agent/run/route.js(PROVIDER_ENV_MAP)` 동시 수정 필수\n\n```\nopenai→OPENAI_API_KEY  anthropic→ANTHROPIC_API_KEY  gemini→GEMINI_API_KEY\ngroq→GROQ_API_KEY      openrouter→OPENROUTER_API_KEY  grok→GROK_API_KEY\ndeepseek→DEEPSEEK_API_KEY  mistral→MISTRAL_API_KEY  nvidia→NVIDIA_API_KEY\ncerebras→CEREBRAS_API_KEY  siliconflow→SILICONFLOW_API_KEY\ncohere→COHERE_API_KEY  zai→ZAI_API_KEY  github→GITHUB_TOKEN\n```\n\n## 자주 발생하는 실수\n\n| 증상 | 원인 | 해결 |\n|------|------|------|\n| API 키 없음 | ENV_KEY_MAP 불일치 | chat/route.js + agent/run/route.js 동시 수정 |\n| import SyntaxError | import가 파일 중간에 삽입 | 최상단으로 이동 |\n| 연결 테스트 실패 | edge 런타임 | `export const runtime = \"nodejs\"` 추가 |\n| BOM 깨짐 | PowerShell Set-Content | `[System.IO.File]::WriteAllText` 사용 |\n\n## 디렉터리 구조\n\n```\napp/api/agent/run/route.js   ← 핵심: OpenClaude CLI 브릿지\napp/api/agent/backup/        ← ZIP 백업/복원\napp/api/chat/route.js        ← 멀티 프로바이더 채팅\ncomponents/AgentPanel.jsx    ← 에이전트 UI\ncomponents/ChatBrowser.jsx   ← 채팅 UI\nlib/agent/backup.js          ← 백업 로직 (lib/agent 중 유일 활성)\nlib/providers.js             ← 프로바이더 정의\nlib/tokenLimits.js           ← 토큰 추적\nbackup/full/*.zip            ← UI 백업/복원 버튼 저장소\n```\n\n---\n> 상세 내용: `plan.md` 참고 | 변경이력: 2026-05-07 경량화 (8.8KB→1.8KB)\n\n<!-- gitnexus:start -->\n# GitNexus — Code Intelligence\n\nThis project is indexed by GitNexus as **mama-v1.2** (12024 symbols, 15782 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.\n\n> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.\n\n## Always Do\n\n- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: \"symbolName\", direction: \"upstream\"})` and report the blast radius (direct callers, affected processes, risk level) to the user.\n- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.\n- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.\n- When exploring unfamiliar code, use `gitnexus_query({query: \"concept\"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.\n- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: \"symbolName\"})`.\n\n## Never Do\n\n- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.\n- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.\n- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.\n- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.\n\n## Resources\n\n| Resource | Use for |\n|----------|---------|\n| `gitnexus://repo/mama-v1.2/context` | Codebase overview, check index freshness |\n| `gitnexus://repo/mama-v1.2/clusters` | All functional areas |\n| `gitnexus://repo/mama-v1.2/processes` | All execution flows |\n| `gitnexus://repo/mama-v1.2/process/{name}` | Step-by-step execution trace |\n\n## CLI\n\n| Task | Read this skill file |\n|------|---------------------|\n| Understand architecture / \"How does X work?\" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |\n| Blast radius / \"What breaks if I change X?\" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |\n| Trace bugs / \"Why is X failing?\" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |\n| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |\n| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |\n| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |\n| Work in the Agent area (480 symbols) | `.claude/skills/generated/agent/SKILL.md` |\n| Work in the Components area (256 symbols) | `.claude/skills/generated/components/SKILL.md` |\n| Work in the Scripts area (50 symbols) | `.claude/skills/generated/scripts/SKILL.md` |\n| Work in the Tests area (43 symbols) | `.claude/skills/generated/tests/SKILL.md` |\n| Work in the Hooks area (38 symbols) | `.claude/skills/generated/hooks/SKILL.md` |\n| Work in the _quarantine_20260509 area (31 symbols) | `.claude/skills/generated/quarantine-20260509/SKILL.md` |\n| Work in the Mcp area (24 symbols) | `.claude/skills/generated/mcp/SKILL.md` |\n| Work in the Run area (18 symbols) | `.claude/skills/generated/run/SKILL.md` |\n| Work in the Userdata area (14 symbols) | `.claude/skills/generated/userdata/SKILL.md` |\n| Work in the _adhoc area (12 symbols) | `.claude/skills/generated/adhoc/SKILL.md` |\n| Work in the Cluster_45 area (11 symbols) | `.claude/skills/generated/cluster-45/SKILL.md` |\n| Work in the Auth area (8 symbols) | `.claude/skills/generated/auth/SKILL.md` |\n| Work in the Chat area (7 symbols) | `.claude/skills/generated/chat/SKILL.md` |\n| Work in the Models area (7 symbols) | `.claude/skills/generated/models/SKILL.md` |\n| Work in the Cluster_37 area (6 symbols) | `.claude/skills/generated/cluster-37/SKILL.md` |\n| Work in the Keys area (6 symbols) | `.claude/skills/generated/keys/SKILL.md` |\n| Work in the Cluster_25 area (5 symbols) | `.claude/skills/generated/cluster-25/SKILL.md` |\n| Work in the Cluster_41 area (5 symbols) | `.claude/skills/generated/cluster-41/SKILL.md` |\n| Work in the Graph area (5 symbols) | `.claude/skills/generated/graph/SKILL.md` |\n| Work in the Reindex area (5 symbols) | `.claude/skills/generated/reindex/SKILL.md` |\n\n<!-- gitnexus:end -->\n\nConversation started: Tuesday, May 12, 2026 12:38 AM\nModel: nvidia/nemotron-3-super-120b-a12b:free\nProvider: openrouter\n\nHost: WSL (Windows Subsystem for Linux)\nUser home directory: /mnt/f/test/mamabot/runtime/hermes/home\nCurrent working directory: /mnt/f/test/mama-v1.2\n\nYou are running inside WSL (Windows Subsystem for Linux). The Windows host filesystem is mounted under /mnt/ — /mnt/c/ is the C: drive, /mnt/d/ is D:, etc. The user's Windows files are typically at /mnt/c/Users/<username>/Desktop/, Documents/, Downloads/, etc. When the user references Windows paths or desktop files, translate to the /mnt/c/ equivalent. You can list /mnt/c/Users/ to discover the Windows username if needed.\n\nYou are a CLI AI Agent. Try not to use markdown but simple text renderable inside a terminal. File delivery: there is no attachment channel — the user reads your response directly in their terminal. Do NOT emit MEDIA:/path tags (those are only intercepted on messaging platforms like Telegram, Discord, Slack, etc.; on the CLI they render as literal text). When referring to a file you created or changed, just state its absolute path in plain text; the user can open it from there.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_back",
+        "description": "Navigate back to the previous page in browser history. Requires browser_navigate to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_click",
+        "description": "Click on an element identified by its ref ID from the snapshot (e.g., '@e5'). The ref IDs are shown in square brackets in the snapshot output. Requires browser_navigate and browser_snapshot to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "description": "The element reference from the snapshot (e.g., '@e5', '@e12')"
+            }
+          },
+          "required": [
+            "ref"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_console",
+        "description": "Get browser console output and JavaScript errors from the current page. Returns console.log/warn/error/info messages and uncaught JS exceptions. Use this to detect silent JavaScript errors, failed API calls, and application warnings. Requires browser_navigate to be called first. When 'expression' is provided, evaluates JavaScript in the page context and returns the result — use this for DOM inspection, reading page state, or extracting data programmatically.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "clear": {
+              "type": "boolean",
+              "default": false,
+              "description": "If true, clear the message buffers after reading"
+            },
+            "expression": {
+              "type": "string",
+              "description": "JavaScript expression to evaluate in the page context. Runs in the browser like DevTools console — full access to DOM, window, document. Return values are serialized to JSON. Example: 'document.title' or 'document.querySelectorAll(\"a\").length'"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_get_images",
+        "description": "Get a list of all images on the current page with their URLs and alt text. Useful for finding images to analyze with the vision tool. Requires browser_navigate to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_navigate",
+        "description": "Navigate to a URL in the browser. Initializes the session and loads the page. Must be called before other browser tools. For plain-text endpoints — URLs ending in .md, .txt, .json, .yaml, .yml, .csv, .xml, raw.githubusercontent.com, or any documented API endpoint — prefer curl via the terminal tool or web_extract; the browser stack is overkill and much slower for these. Use browser tools when you need to interact with a page (click, fill forms, dynamic content). Returns a compact page snapshot with interactive elements and ref IDs — no need to call browser_snapshot separately after navigating.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "The URL to navigate to (e.g., 'https://example.com')"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_press",
+        "description": "Press a keyboard key. Useful for submitting forms (Enter), navigating (Tab), or keyboard shortcuts. Requires browser_navigate to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Key to press (e.g., 'Enter', 'Tab', 'Escape', 'ArrowDown')"
+            }
+          },
+          "required": [
+            "key"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_scroll",
+        "description": "Scroll the page in a direction. Use this to reveal more content that may be below or above the current viewport. Requires browser_navigate to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down"
+              ],
+              "description": "Direction to scroll"
+            }
+          },
+          "required": [
+            "direction"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_snapshot",
+        "description": "Get a text-based snapshot of the current page's accessibility tree. Returns interactive elements with ref IDs (like @e1, @e2) for browser_click and browser_type. full=false (default): compact view with interactive elements. full=true: complete page content. Snapshots over 8000 chars are truncated or LLM-summarized. Requires browser_navigate first. Note: browser_navigate already returns a compact snapshot — use this to refresh after interactions that change the page, or with full=true for complete content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "full": {
+              "type": "boolean",
+              "description": "If true, returns complete page content. If false (default), returns compact view with interactive elements only.",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_type",
+        "description": "Type text into an input field identified by its ref ID. Clears the field first, then types the new text. Requires browser_navigate and browser_snapshot to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ref": {
+              "type": "string",
+              "description": "The element reference from the snapshot (e.g., '@e3')"
+            },
+            "text": {
+              "type": "string",
+              "description": "The text to type into the field"
+            }
+          },
+          "required": [
+            "ref",
+            "text"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "browser_vision",
+        "description": "Take a screenshot of the current page and analyze it with vision AI. Use this when you need to visually understand what's on the page - especially useful for CAPTCHAs, visual verification challenges, complex layouts, or when the text snapshot doesn't capture important visual information. Returns both the AI analysis and a screenshot_path that you can share with the user by including MEDIA:<screenshot_path> in your response. Requires browser_navigate to be called first.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "description": "What you want to know about the page visually. Be specific about what you're looking for."
+            },
+            "annotate": {
+              "type": "boolean",
+              "default": false,
+              "description": "If true, overlay numbered [N] labels on interactive elements. Each [N] maps to ref @eN for subsequent browser commands. Useful for QA and spatial reasoning about page layout."
+            }
+          },
+          "required": [
+            "question"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "clarify",
+        "description": "Ask the user a question when you need clarification, feedback, or a decision before proceeding. Supports two modes:\n\n1. **Multiple choice** — provide up to 4 choices. The user picks one or types their own answer via a 5th 'Other' option.\n2. **Open-ended** — omit choices entirely. The user types a free-form response.\n\nUse this tool when:\n- The task is ambiguous and you need the user to choose an approach\n- You want post-task feedback ('How did that work out?')\n- You want to offer to save a skill or update memory\n- A decision has meaningful trade-offs the user should weigh in on\n\nDo NOT use this tool for simple yes/no confirmation of dangerous commands (the terminal tool handles that). Prefer making a reasonable default choice yourself when the decision is low-stakes.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "description": "The question to present to the user."
+            },
+            "choices": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4,
+              "description": "Up to 4 answer choices. Omit this parameter entirely to ask an open-ended question. When provided, the UI automatically appends an 'Other (type your answer)' option."
+            }
+          },
+          "required": [
+            "question"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "delegate_task",
+        "description": "Spawn one or more subagents to work on tasks in isolated contexts. Each subagent gets its own conversation, terminal session, and toolset. Only the final summary is returned -- intermediate tool results never enter your context window.\n\nTWO MODES (one of 'goal' or 'tasks' is required):\n1. Single task: provide 'goal' (+ optional context, toolsets)\n2. Batch (parallel): provide 'tasks' array with up to 3 items concurrently for this user (configured via delegation.max_concurrent_children in config.yaml). All run in parallel and results are returned together. Nested delegation is OFF for this user (max_spawn_depth=1): every child is a leaf and cannot delegate further. Raise delegation.max_spawn_depth in config.yaml to enable nesting.\n\nWHEN TO USE delegate_task:\n- Reasoning-heavy subtasks (debugging, code review, research synthesis)\n- Tasks that would flood your context with intermediate data\n- Parallel independent workstreams (research A and B simultaneously)\n\nWHEN NOT TO USE (use these instead):\n- Mechanical multi-step work with no reasoning needed -> use execute_code\n- Single tool call -> just call the tool directly\n- Tasks needing user interaction -> subagents cannot use clarify\n- Durable long-running work that must outlive the current turn -> use cronjob (action='create') or terminal(background=True, notify_on_complete=True) instead. delegate_task runs SYNCHRONOUSLY inside the parent turn: if the parent is interrupted (user sends a new message, /stop, /new) the child is cancelled with status='interrupted' and its work is discarded. Children cannot continue in the background.\n\nIMPORTANT:\n- Subagents have NO memory of your conversation. Pass all relevant info (file paths, error messages, constraints) via the 'context' field.\n- If the user is writing in a non-English language, or asked for output in a specific language / tone / style, say so in 'context' (e.g. \"respond in Chinese\", \"return output in Japanese\"). Otherwise subagents default to English and their summaries will contaminate your final reply with the wrong language.\n- Subagent summaries are SELF-REPORTS, not verified facts. A subagent that claims \"uploaded successfully\" or \"file written\" may be wrong. For operations with external side-effects (HTTP POST/PUT, remote writes, file creation at shared paths, publishing), require the subagent to return a verifiable handle (URL, ID, absolute path, HTTP status) and verify it yourself — fetch the URL, stat the file, read back the content — before telling the user the operation succeeded.\n- Leaf subagents (role='leaf', the default) CANNOT call: delegate_task, clarify, memory, send_message, execute_code.\n- Orchestrator subagents (role='orchestrator') retain delegate_task so they can spawn their own workers, but still cannot use clarify, memory, send_message, or execute_code. Orchestrators are bounded by max_spawn_depth=1 for this user and can be disabled globally via delegation.orchestrator_enabled=false.\n- Each subagent gets its own terminal session (separate working directory and state).\n- Results are always returned as an array, one entry per task.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "goal": {
+              "type": "string",
+              "description": "What the subagent should accomplish. Be specific and self-contained -- the subagent knows nothing about your conversation history."
+            },
+            "context": {
+              "type": "string",
+              "description": "Background information the subagent needs: file paths, error messages, project structure, constraints. The more specific you are, the better the subagent performs."
+            },
+            "toolsets": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Toolsets to enable for this subagent. Default: inherits your enabled toolsets. Available toolsets: 'browser', 'computer_use', 'cronjob', 'discord', 'discord_admin', 'feishu_doc', 'feishu_drive', 'file', 'homeassistant', 'image_gen', 'kanban', 'search', 'session_search', 'skills', 'spotify', 'terminal', 'todo', 'tts', 'video', 'vision', 'web', 'yuanbao'. Common patterns: ['terminal', 'file'] for code work, ['web'] for research, ['browser'] for web interaction, ['terminal', 'file', 'web'] for full-stack tasks."
+            },
+            "tasks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "goal": {
+                    "type": "string",
+                    "description": "Task goal"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Task-specific context"
+                  },
+                  "toolsets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Toolsets for this specific task. Available: 'browser', 'computer_use', 'cronjob', 'discord', 'discord_admin', 'feishu_doc', 'feishu_drive', 'file', 'homeassistant', 'image_gen', 'kanban', 'search', 'session_search', 'skills', 'spotify', 'terminal', 'todo', 'tts', 'video', 'vision', 'web', 'yuanbao'. Use 'web' for network access, 'terminal' for shell, 'browser' for web interaction."
+                  },
+                  "acp_command": {
+                    "type": "string",
+                    "description": "Per-task ACP command override (e.g. 'copilot'). Overrides the top-level acp_command for this task only. Do NOT set unless the user explicitly told you an ACP CLI is installed."
+                  },
+                  "acp_args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Per-task ACP args override. Leave empty unless acp_command is set."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "leaf",
+                      "orchestrator"
+                    ],
+                    "description": "Per-task role override. See top-level 'role' for semantics."
+                  }
+                },
+                "required": [
+                  "goal"
+                ]
+              },
+              "description": "Batch mode: tasks to run in parallel (up to 3 for this user, set via delegation.max_concurrent_children). Each gets its own subagent with isolated context and terminal session. When provided, top-level goal/context/toolsets are ignored."
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "leaf",
+                "orchestrator"
+              ],
+              "description": "Role of the child agent. 'leaf' (default) = focused worker, cannot delegate further. 'orchestrator' = can use delegate_task to spawn its own workers. Nesting is OFF for this user (max_spawn_depth=1); 'orchestrator' is silently forced to 'leaf'. Raise delegation.max_spawn_depth in config.yaml to enable."
+            },
+            "acp_command": {
+              "type": "string",
+              "description": "Override ACP command for child agents (e.g. 'copilot'). When set, children use ACP subprocess transport instead of inheriting the parent's transport. Requires an ACP-compatible CLI (currently GitHub Copilot CLI via 'copilot --acp --stdio'). See agent/copilot_acp_client.py for the implementation. IMPORTANT: Do NOT set this unless the user has explicitly told you a specific ACP-compatible CLI is installed and configured. Leave empty to use the parent's default transport (Hermes subagents)."
+            },
+            "acp_args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Arguments for the ACP command (default: ['--acp', '--stdio']). Only used when acp_command is set. Leave empty unless acp_command is explicitly provided."
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "execute_code",
+        "description": "Run a Python script that can call Hermes tools programmatically. Use this when you need 3+ tool calls with processing logic between them, need to filter/reduce large tool outputs before they enter your context, need conditional branching (if X then Y else Z), or need to loop (fetch N pages, process N files, retry on failure).\n\nUse normal tool calls instead when: single tool call with no processing, you need to see the full result and apply complex reasoning, or the task requires interactive user input.\n\nAvailable via `from hermes_tools import ...`:\n\n  read_file(path: str, offset: int = 1, limit: int = 500) -> dict\n    Lines are 1-indexed. Returns {\"content\": \"...\", \"total_lines\": N}\n  write_file(path: str, content: str) -> dict\n    Always overwrites the entire file.\n  search_files(pattern: str, target=\"content\", path=\".\", file_glob=None, limit=50) -> dict\n    target: \"content\" (search inside files) or \"files\" (find files by name). Returns {\"matches\": [...]}\n  patch(path: str, old_string: str, new_string: str, replace_all: bool = False) -> dict\n    Replaces old_string with new_string in the file.\n  terminal(command: str, timeout=None, workdir=None) -> dict\n    Foreground only (no background/pty). Returns {\"output\": \"...\", \"exit_code\": N}\n\nLimits: 5-minute timeout, 50KB stdout cap, max 50 tool calls per script. terminal() is foreground-only (no background or pty).\n\nScripts run in the session's working directory with the active venv's python, so project deps (pandas, etc.) and relative paths work like in terminal().\n\nPrint your final result to stdout. Use Python stdlib (json, re, math, csv, datetime, collections, etc.) for processing between tool calls.\n\nAlso available (no import needed — built into hermes_tools):\n  json_parse(text: str) — json.loads with strict=False; use for terminal() output with control chars\n  shell_quote(s: str) — shlex.quote(); use when interpolating dynamic strings into shell commands\n  retry(fn, max_attempts=3, delay=2) — retry with exponential backoff for transient failures",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Python code to execute. Import tools with `from hermes_tools import terminal, ...` and print your final result to stdout."
+            }
+          },
+          "required": [
+            "code"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "memory",
+        "description": "Save durable information to persistent memory that survives across sessions. Memory is injected into future turns, so keep it compact and focused on facts that will still matter later.\n\nWHEN TO SAVE (do this proactively, don't wait to be asked):\n- User corrects you or says 'remember this' / 'don't do that again'\n- User shares a preference, habit, or personal detail (name, role, timezone, coding style)\n- You discover something about the environment (OS, installed tools, project structure)\n- You learn a convention, API quirk, or workflow specific to this user's setup\n- You identify a stable fact that will be useful again in future sessions\n\nPRIORITY: User preferences and corrections > environment facts > procedural knowledge. The most valuable memory prevents the user from having to repeat themselves.\n\nDo NOT save task progress, session outcomes, completed-work logs, or temporary TODO state to memory; use session_search to recall those from past transcripts.\nIf you've discovered a new way to do something, solved a problem that could be necessary later, save it as a skill with the skill tool.\n\nTWO TARGETS:\n- 'user': who the user is -- name, role, preferences, communication style, pet peeves\n- 'memory': your notes -- environment facts, project conventions, tool quirks, lessons learned\n\nACTIONS: add (new entry), replace (update existing -- old_text identifies it), remove (delete -- old_text identifies it).\n\nSKIP: trivial/obvious info, things easily re-discovered, raw data dumps, and temporary task state.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "add",
+                "replace",
+                "remove"
+              ],
+              "description": "The action to perform."
+            },
+            "target": {
+              "type": "string",
+              "enum": [
+                "memory",
+                "user"
+              ],
+              "description": "Which memory store: 'memory' for personal notes, 'user' for user profile."
+            },
+            "content": {
+              "type": "string",
+              "description": "The entry content. Required for 'add' and 'replace'."
+            },
+            "old_text": {
+              "type": "string",
+              "description": "Short unique substring identifying the entry to replace or remove."
+            }
+          },
+          "required": [
+            "action",
+            "target"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "patch",
+        "description": "Targeted find-and-replace edits in files. Use this instead of sed/awk in terminal. Uses fuzzy matching (9 strategies) so minor whitespace/indentation differences won't break it. Returns a unified diff. Auto-runs syntax checks after editing.\n\nREPLACE MODE (mode='replace', default): find a unique string and replace it. REQUIRED PARAMETERS: mode, path, old_string, new_string.\nPATCH MODE (mode='patch'): apply V4A multi-file patches for bulk changes. REQUIRED PARAMETERS: mode, patch.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "replace",
+                "patch"
+              ],
+              "description": "Edit mode. 'replace' (default): requires path + old_string + new_string. 'patch': requires patch content only.",
+              "default": "replace"
+            },
+            "path": {
+              "type": "string",
+              "description": "REQUIRED when mode='replace'. File path to edit."
+            },
+            "old_string": {
+              "type": "string",
+              "description": "REQUIRED when mode='replace'. Exact text to find and replace. Must be unique in the file unless replace_all=true. Include surrounding context lines to ensure uniqueness."
+            },
+            "new_string": {
+              "type": "string",
+              "description": "REQUIRED when mode='replace'. Replacement text. Pass empty string '' to delete the matched text."
+            },
+            "replace_all": {
+              "type": "boolean",
+              "description": "Replace all occurrences instead of requiring a unique match (default: false)",
+              "default": false
+            },
+            "patch": {
+              "type": "string",
+              "description": "REQUIRED when mode='patch'. V4A format patch content. Format:\n*** Begin Patch\n*** Update File: path/to/file\n@@ context hint @@\n context line\n-removed line\n+added line\n*** End Patch"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "process",
+        "description": "Manage background processes started with terminal(background=true). Actions: 'list' (show all), 'poll' (check status + new output), 'log' (full output with pagination), 'wait' (block until done or timeout), 'kill' (terminate), 'write' (send raw stdin data without newline), 'submit' (send data + Enter, for answering prompts), 'close' (close stdin/send EOF).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "list",
+                "poll",
+                "log",
+                "wait",
+                "kill",
+                "write",
+                "submit",
+                "close"
+              ],
+              "description": "Action to perform on background processes"
+            },
+            "session_id": {
+              "type": "string",
+              "description": "Process session ID (from terminal background output). Required for all actions except 'list'."
+            },
+            "data": {
+              "type": "string",
+              "description": "Text to send to process stdin (for 'write' and 'submit' actions)"
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Max seconds to block for 'wait' action. Returns partial output on timeout.",
+              "minimum": 1
+            },
+            "offset": {
+              "type": "integer",
+              "description": "Line offset for 'log' action (default: last 200 lines)"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max lines to return for 'log' action",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file",
+        "description": "Read a text file with line numbers and pagination. Use this instead of cat/head/tail in terminal. Output format: 'LINE_NUM|CONTENT'. Suggests similar filenames if not found. Use offset and limit for large files. Reads exceeding ~100K characters are rejected; use offset and limit to read specific sections of large files. NOTE: Cannot read images or binary files — use vision_analyze for images.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to the file to read (absolute, relative, or ~/path)"
+            },
+            "offset": {
+              "type": "integer",
+              "description": "Line number to start reading from (1-indexed, default: 1)",
+              "default": 1,
+              "minimum": 1
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of lines to read (default: 500, max: 2000)",
+              "default": 500,
+              "maximum": 2000
+            }
+          },
+          "required": [
+            "path"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "search_files",
+        "description": "Search file contents or find files by name. Use this instead of grep/rg/find/ls in terminal. Ripgrep-backed, faster than shell equivalents.\n\nContent search (target='content'): Regex search inside files. Output modes: full matches with line numbers, file paths only, or match counts.\n\nFile search (target='files'): Find files by glob pattern (e.g., '*.py', '*config*'). Also use this instead of ls — results sorted by modification time.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "Regex pattern for content search, or glob pattern (e.g., '*.py') for file search"
+            },
+            "target": {
+              "type": "string",
+              "enum": [
+                "content",
+                "files"
+              ],
+              "description": "'content' searches inside file contents, 'files' searches for files by name",
+              "default": "content"
+            },
+            "path": {
+              "type": "string",
+              "description": "Directory or file to search in (default: current working directory)",
+              "default": "."
+            },
+            "file_glob": {
+              "type": "string",
+              "description": "Filter files by pattern in grep mode (e.g., '*.py' to only search Python files)"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of results to return (default: 50)",
+              "default": 50
+            },
+            "offset": {
+              "type": "integer",
+              "description": "Skip first N results for pagination (default: 0)",
+              "default": 0
+            },
+            "output_mode": {
+              "type": "string",
+              "enum": [
+                "content",
+                "files_only",
+                "count"
+              ],
+              "description": "Output format for grep mode: 'content' shows matching lines with line numbers, 'files_only' lists file paths, 'count' shows match counts per file",
+              "default": "content"
+            },
+            "context": {
+              "type": "integer",
+              "description": "Number of context lines before and after each match (grep mode only)",
+              "default": 0
+            }
+          },
+          "required": [
+            "pattern"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "session_search",
+        "description": "Search your long-term memory of past conversations, or browse recent sessions. This is your recall -- every past session is searchable, and this tool summarizes what happened.\n\nTWO MODES:\n1. Recent sessions (no query): Call with no arguments to see what was worked on recently. Returns titles, previews, and timestamps. Zero LLM cost, instant. Start here when the user asks what were we working on or what did we do recently.\n2. Keyword search (with query): Search for specific topics across all past sessions. Returns LLM-generated summaries of matching sessions.\n\nUSE THIS PROACTIVELY when:\n- The user says 'we did this before', 'remember when', 'last time', 'as I mentioned'\n- The user asks about a topic you worked on before but don't have in current context\n- The user references a project, person, or concept that seems familiar but isn't in memory\n- You want to check if you've solved a similar problem before\n- The user asks 'what did we do about X?' or 'how did we fix Y?'\n\nDon't hesitate to search when it is actually cross-session -- it's fast and cheap. Better to search and confirm than to guess or ask the user to repeat themselves.\n\nSearch syntax: keywords joined with OR for broad recall (elevenlabs OR baseten OR funding), phrases for exact match (\"docker networking\"), boolean (python NOT java), prefix (deploy*). IMPORTANT: Use OR between keywords for best results — FTS5 defaults to AND which misses sessions that only mention some terms. If a broad OR query returns nothing, try individual keyword searches in parallel. Returns summaries of the top matching sessions.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query — keywords, phrases, or boolean expressions to find in past sessions. Omit this parameter entirely to browse recent sessions instead (returns titles, previews, timestamps with no LLM cost)."
+            },
+            "role_filter": {
+              "type": "string",
+              "description": "Optional: only search messages from specific roles (comma-separated). E.g. 'user,assistant' to skip tool outputs."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max sessions to summarize (default: 3, max: 5).",
+              "default": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "skill_manage",
+        "description": "Manage skills (create, update, delete). Skills are your procedural memory — reusable approaches for recurring task types. New skills go to ~/./skills/; existing skills can be modified wherever they live.\n\nActions: create (full SKILL.md + optional category), patch (old_string/new_string — preferred for fixes), edit (full SKILL.md rewrite — major overhauls only), delete, write_file, remove_file.\n\nOn delete, pass `absorbed_into=<umbrella>` when you're merging this skill's content into another one, or `absorbed_into=\"\"` when you're pruning it with no forwarding target. This lets the curator tell consolidation from pruning without guessing, so downstream consumers (cron jobs that reference the old skill name, etc.) get updated correctly. The target you name in `absorbed_into` must already exist — create/patch the umbrella first, then delete.\n\nCreate when: complex task succeeded (5+ calls), errors overcome, user-corrected approach worked, non-trivial workflow discovered, or user asks you to remember a procedure.\nUpdate when: instructions stale/wrong, OS-specific failures, missing steps or pitfalls found during use. If you used a skill and hit issues not covered by it, patch it immediately.\n\nAfter difficult/iterative tasks, offer to save as a skill. Skip for simple one-offs. Confirm with user before creating/deleting.\n\nGood skills: trigger conditions, numbered steps with exact commands, pitfalls section, verification steps. Use skill_view() to see format examples.\n\nPinned skills are protected from deletion only — skill_manage(action='delete') will refuse with a message pointing the user to `hermes curator unpin <name>`. Patches and edits go through on pinned skills so you can still improve them as pitfalls come up; pin only guards against irrecoverable loss.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "patch",
+                "edit",
+                "delete",
+                "write_file",
+                "remove_file"
+              ],
+              "description": "The action to perform."
+            },
+            "name": {
+              "type": "string",
+              "description": "Skill name (lowercase, hyphens/underscores, max 64 chars). Must match an existing skill for patch/edit/delete/write_file/remove_file."
+            },
+            "content": {
+              "type": "string",
+              "description": "Full SKILL.md content (YAML frontmatter + markdown body). Required for 'create' and 'edit'. For 'edit', read the skill first with skill_view() and provide the complete updated text."
+            },
+            "old_string": {
+              "type": "string",
+              "description": "Text to find in the file (required for 'patch'). Must be unique unless replace_all=true. Include enough surrounding context to ensure uniqueness."
+            },
+            "new_string": {
+              "type": "string",
+              "description": "Replacement text (required for 'patch'). Can be empty string to delete the matched text."
+            },
+            "replace_all": {
+              "type": "boolean",
+              "description": "For 'patch': replace all occurrences instead of requiring a unique match (default: false)."
+            },
+            "category": {
+              "type": "string",
+              "description": "Optional category/domain for organizing the skill (e.g., 'devops', 'data-science', 'mlops'). Creates a subdirectory grouping. Only used with 'create'."
+            },
+            "file_path": {
+              "type": "string",
+              "description": "Path to a supporting file within the skill directory. For 'write_file'/'remove_file': required, must be under references/, templates/, scripts/, or assets/. For 'patch': optional, defaults to SKILL.md if omitted."
+            },
+            "file_content": {
+              "type": "string",
+              "description": "Content for the file. Required for 'write_file'."
+            },
+            "absorbed_into": {
+              "type": "string",
+              "description": "For 'delete' only — declares intent so the curator can tell consolidation from pruning without guessing. Pass the umbrella skill name when this skill's content was merged into another (the target must already exist). Pass an empty string when the skill is truly stale and being pruned with no forwarding target. Omitting the arg on delete is supported for backward compatibility but downstream tooling (e.g. cron-job skill reference rewriting) will have to guess at intent."
+            }
+          },
+          "required": [
+            "action",
+            "name"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "skill_view",
+        "description": "Skills allow for loading information about specific tasks and workflows, as well as scripts and templates. Load a skill's full content or access its linked files (references, templates, scripts). First call returns SKILL.md content plus a 'linked_files' dict showing available references/templates/scripts. To access those, call again with file_path parameter.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The skill name (use skills_list to see available skills). For plugin-provided skills, use the qualified form 'plugin:skill' (e.g. 'superpowers:writing-plans')."
+            },
+            "file_path": {
+              "type": "string",
+              "description": "OPTIONAL: Path to a linked file within the skill (e.g., 'references/api.md', 'templates/config.yaml', 'scripts/validate.py'). Omit to get the main SKILL.md content."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "skills_list",
+        "description": "List available skills (name + description). Use skill_view(name) to load full content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string",
+              "description": "Optional category filter to narrow results"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "terminal",
+        "description": "Execute shell commands on a Linux environment. Filesystem usually persists between calls.\n\nDo NOT use cat/head/tail to read files — use read_file instead.\nDo NOT use grep/rg/find to search — use search_files instead.\nDo NOT use ls to list directories — use search_files(target='files') instead.\nDo NOT use sed/awk to edit files — use patch instead.\nDo NOT use echo/cat heredoc to create files — use write_file instead.\nReserve terminal for: builds, installs, git, processes, scripts, network, package managers, and anything that needs a shell.\n\nForeground (default): Commands return INSTANTLY when done, even if the timeout is high. Set timeout=300 for long builds/scripts — you'll still get the result in seconds if it's fast. Prefer foreground for short commands.\nBackground: Set background=true to get a session_id. Two patterns:\n  (1) Long-lived processes that never exit (servers, watchers).\n  (2) Long-running tasks with notify_on_complete=true — you can keep working on other things and the system auto-notifies you when the task finishes. Great for test suites, builds, deployments, or anything that takes more than a minute.\nFor servers/watchers, do NOT use shell-level background wrappers (nohup/disown/setsid/trailing '&') in foreground mode. Use background=true so Hermes can track lifecycle and output.\nAfter starting a server, verify readiness with a health check or log signal, then run tests in a separate terminal() call. Avoid blind sleep loops.\nUse process(action=\"poll\") for progress checks, process(action=\"wait\") to block until done.\nWorking directory: Use 'workdir' for per-command cwd.\nPTY mode: Set pty=true for interactive CLI tools (Codex, Claude Code, Python REPL).\n\nDo NOT use vim/nano/interactive tools without pty=true — they hang without a pseudo-terminal. Pipe git output to cat if it might page.\n",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "The command to execute on the VM"
+            },
+            "background": {
+              "type": "boolean",
+              "description": "Run the command in the background. Two patterns: (1) Long-lived processes that never exit (servers, watchers). (2) Long-running tasks paired with notify_on_complete=true — you can keep working and get notified when the task finishes. For short commands, prefer foreground with a generous timeout instead.",
+              "default": false
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Max seconds to wait (default: 180, foreground max: 600). Returns INSTANTLY when command finishes — set high for long tasks, you won't wait unnecessarily. Foreground timeout above 600s is rejected; use background=true for longer commands.",
+              "minimum": 1
+            },
+            "workdir": {
+              "type": "string",
+              "description": "Working directory for this command (absolute path). Defaults to the session working directory."
+            },
+            "pty": {
+              "type": "boolean",
+              "description": "Run in pseudo-terminal (PTY) mode for interactive CLI tools like Codex, Claude Code, or Python REPL. Only works with local and SSH backends. Default: false.",
+              "default": false
+            },
+            "notify_on_complete": {
+              "type": "boolean",
+              "description": "When true (and background=true), you'll be automatically notified exactly once when the process finishes. **This is the right choice for almost every long-running task** — tests, builds, deployments, multi-item batch jobs, anything that takes over a minute and has a defined end. Use this and keep working on other things; the system notifies you on exit. MUTUALLY EXCLUSIVE with watch_patterns — when both are set, watch_patterns is dropped.",
+              "default": false
+            },
+            "watch_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Strings to watch for in background process output. HARD RATE LIMIT: at most 1 notification per 15 seconds per process — matches arriving inside the cooldown are dropped. After 3 consecutive 15-second windows with dropped matches, watch_patterns is automatically disabled for that process and promoted to notify_on_complete behavior (one notification on exit, no more mid-process spam). USE ONLY for truly rare, one-shot mid-process signals on LONG-LIVED processes that will never exit on their own — e.g. ['Application startup complete'] on a server so you know when to hit its endpoint, or ['migration done'] on a daemon. DO NOT use for: (1) end-of-run markers like 'DONE'/'PASS' — use notify_on_complete instead; (2) error patterns like 'ERROR'/'Traceback' in loops or multi-item batch jobs — they fire on every iteration and you'll hit the strike limit fast; (3) anything you'd ever combine with notify_on_complete. When in doubt, choose notify_on_complete. MUTUALLY EXCLUSIVE with notify_on_complete — set one, not both."
+            }
+          },
+          "required": [
+            "command"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "text_to_speech",
+        "description": "Convert text to speech audio. Returns a MEDIA: path that the platform delivers as native audio. Compatible providers render as a voice bubble on Telegram; otherwise audio is sent as a regular attachment. In CLI mode, saves to ~/voice-memos/. Voice and provider are user-configured (built-in providers like edge/openai or custom command providers under tts.providers.<name>), not model-selected.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text to convert to speech. Provider-specific character caps apply and are enforced automatically (OpenAI 4096, xAI 15000, MiniMax 10000, ElevenLabs 5k-40k depending on model); over-long input is truncated."
+            },
+            "output_path": {
+              "type": "string",
+              "description": "Optional custom file path to save the audio. Defaults to ~/./audio_cache/<timestamp>.mp3"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "todo",
+        "description": "Manage your task list for the current session. Use for complex tasks with 3+ steps or when the user provides multiple tasks. Call with no parameters to read the current list.\n\nWriting:\n- Provide 'todos' array to create/update items\n- merge=false (default): replace the entire list with a fresh plan\n- merge=true: update existing items by id, add any new ones\n\nEach item: {id: string, content: string, status: pending|in_progress|completed|cancelled}\nList order is priority. Only ONE item in_progress at a time.\nMark items completed immediately when done. If something fails, cancel it and add a revised item.\n\nAlways returns the full current list.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "todos": {
+              "type": "array",
+              "description": "Task items to write. Omit to read current list.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique item identifier"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Task description"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "in_progress",
+                      "completed",
+                      "cancelled"
+                    ],
+                    "description": "Current status"
+                  }
+                },
+                "required": [
+                  "id",
+                  "content",
+                  "status"
+                ]
+              }
+            },
+            "merge": {
+              "type": "boolean",
+              "description": "true: update existing items by id, add new ones. false (default): replace the entire list.",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "vision_analyze",
+        "description": "Load an image into the conversation so you can see it. Accepts a URL, local file path, or data URL. When your active model has native vision, the image is attached to your context directly and you read the pixels yourself on the next turn — call this any time the user references an image (filepath in their message, URL in tool output, screenshot from the browser, etc.). For non-vision models, falls back to an auxiliary vision model that returns a text description.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "image_url": {
+              "type": "string",
+              "description": "Image URL (http/https), local file path, or data: URL to load."
+            },
+            "question": {
+              "type": "string",
+              "description": "Your specific question or request about the image. Optional context the model uses on the next turn after seeing the image."
+            }
+          },
+          "required": [
+            "image_url",
+            "question"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "write_file",
+        "description": "Write content to a file, completely replacing existing content. Use this instead of echo/cat heredoc in terminal. Creates parent directories automatically. OVERWRITES the entire file — use 'patch' for targeted edits. Auto-runs syntax checks on .py/.json/.yaml/.toml and other linted languages; only NEW errors introduced by this write are surfaced (pre-existing errors are filtered out).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to the file to write (will be created if it doesn't exist, overwritten if it does)"
+            },
+            "content": {
+              "type": "string",
+              "description": "Complete content to write to the file"
+            }
+          },
+          "required": [
+            "path",
+            "content"
+          ]
+        }
+      }
+    }
+  ],
+  "message_count": 18,
+  "messages": [
+    {
+      "role": "user",
+      "content": "[중요] 현재 작업 폴더를 분석하고 제안만 해줘. 파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\n\n이 프로젝트의 폴더 구조를 간단히 분석하고 다음으로 구현할 3가지만 제안해줘. 파일은 수정하지마."
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "We need to analyze the current directory structure, then suggest 3 next implementation ideas (only suggestions, no modifications). We should examine the project structure. Use tools to list files/folders. Probably need to read directory. We'll use terminal ls or search_files for files only? Use search_files target='files' to list. Let's do that.\n",
+      "finish_reason": "tool_calls",
+      "reasoning_content": "We need to analyze the current directory structure, then suggest 3 next implementation ideas (only suggestions, no modifications). We should examine the project structure. Use tools to list files/folders. Probably need to read directory. We'll use terminal ls or search_files for files only? Use search_files target='files' to list. Let's do that.\n",
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-bb08c9fa36dc2f11",
+          "call_id": "chatcmpl-tool-bb08c9fa36dc2f11",
+          "response_item_id": "fc_chatcmpl-tool-bb08c9fa36dc2f11",
+          "type": "function",
+          "function": {
+            "name": "search_files",
+            "arguments": "{\"pattern\": \"*\", \"target\": \"files\", \"path\": \".\", \"limit\": 100}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "name": "search_files",
+      "content": "{\"total_count\": 100, \"files\": [\"./.hermes-workspace/ignored.json\", \"./.hermes-workspace/memory.md\", \"./.hermes-workspace/instructions.md\", \"./.hermes-workspace/workspace.json\", \"./.next-dev/trace\", \"./.next-dev/app-build-manifest.json\", \"./.next-dev/build-manifest.json\", \"./.next-dev/react-loadable-manifest.json\", \"./.next-dev/static/webpack/webpack.815163a0103f82c8.hot-update.js\", \"./.next-dev/static/webpack/815163a0103f82c8.webpack.hot-update.json\", \"./.next-dev/static/webpack/app/layout.815163a0103f82c8.hot-update.js\", \"./.next-dev/static/webpack/633457081244afec._.hot-update.json\", \"./.next-dev/static/chunks/webpack.js\", \"./.next-dev/static/chunks/app/_not-found/page.js\", \"./.next-dev/static/chunks/app/layout.js\", \"./.next-dev/static/chunks/app/global-error.js\", \"./.next-dev/static/chunks/app/error.js\", \"./.next-dev/static/chunks/app/not-found.js\", \"./.next-dev/static/chunks/app/page.js\", \"./.next-dev/static/chunks/_app-pages-browser_components_ChatBrowser_jsx.js\", \"./.next-dev/static/chunks/main-app.js\", \"./.next-dev/static/chunks/_app-pages-browser_node_modules_fuse_js_dist_fuse_mjs.js\", \"./.next-dev/static/chunks/app-pages-internals.js\", \"./.next-dev/static/chunks/_app-pages-browser_components_DraggableAgentIcon_jsx.js\", \"./.next-dev/static/chunks/polyfills.js\", \"./.next-dev/static/css/app/layout.css\", \"./.next-dev/static/development/_buildManifest.js\", \"./.next-dev/static/development/_ssgManifest.js\", \"./.next-dev/server/server-reference-manifest.json\", \"./.next-dev/server/app-paths-manifest.json\", \"./.next-dev/server/pages-manifest.json\", \"./.next-dev/server/server-reference-manifest.js\", \"./.next-dev/server/webpack-runtime.js\", \"./.next-dev/server/next-font-manifest.js\", \"./.next-dev/server/next-font-manifest.json\", \"./.next-dev/server/middleware-build-manifest.js\", \"./.next-dev/server/middleware-react-loadable-manifest.js\", \"./.next-dev/server/app/api/keys/route.js\", \"./.next-dev/server/app/api/agent/memory/route.js\", \"./.next-dev/server/app/api/agent/run/route.js\", \"./.next-dev/server/app/api/agent/gitnexus/route.js\", \"./.next-dev/server/app/api/agent/dashboard/route.js\", \"./.next-dev/server/app/api/auth/route.js\", \"./.next-dev/server/app/api/models/route.js\", \"./.next-dev/server/app/api/agents-context/route.js\", \"./.next-dev/server/app/api/userdata/route.js\", \"./.next-dev/server/app/page_client-reference-manifest.js\", \"./.next-dev/server/app/_not-found/page_client-reference-manifest.js\", \"./.next-dev/server/app/_not-found/page.js\", \"./.next-dev/server/app/page.js\", \"./.next-dev/server/vendor-chunks/next.js\", \"./.next-dev/server/vendor-chunks/@opentelemetry.js\", \"./.next-dev/server/vendor-chunks/@swc.js\", \"./.next-dev/server/interception-route-rewrite-manifest.js\", \"./.next-dev/server/middleware-manifest.json\", \"./.next-dev/types/package.json\", \"./.next-dev/types/app/layout.ts\", \"./.next-dev/types/app/page.ts\", \"./.next-dev/types/app/api/keys/route.ts\", \"./.next-dev/types/app/api/agent/memory/route.ts\", \"./.next-dev/types/app/api/agent/run/route.ts\", \"./.next-dev/types/app/api/agent/gitnexus/route.ts\", \"./.next-dev/types/app/api/agent/dashboard/route.ts\", \"./.next-dev/types/app/api/models/route.ts\", \"./.next-dev/types/app/api/agents-context/route.ts\", \"./.next-dev/types/app/api/auth/route.ts\", \"./.next-dev/types/app/api/userdata/route.ts\", \"./.next-dev/package.json\", \"./.next-dev/cache/fetch-cache/0e5dfff30ba9e9015fdabc499a5c985504f490acf6154b89ea442adeecaef69b\", \"./.next-dev/cache/fetch-cache/3dc9c5162f35cbffd5dc4eda1b3e54ebc8499744e7186579a8061dcaf0068ce3\", \"./.next-dev/cache/fetch-cache/7c7400876fe1096bbb7c672e0eb5716218a57a016b9919346e51d4ab34209ed2\", \"./.next-dev/cache/fetch-cache/b2affa2229e4e5e195519a6bb61ce219a25b0ab469e9bdfff58e82fee042f26b\", \"./.next-dev/cache/fetch-cache/4c3fc45d1d41d489f69b75a0b29cc5b2a10d344f704a4e26c7db5eb38c65b911\", \"./.next-dev/cache/fetch-cache/490a7fb3965e4eb3cd4e971b4ecfe0150c7abe42debf664cfdb66a5f1a503df3\", \"./.next-dev/cache/fetch-cache/adaf4ff03f606ebeca81685c981523a1eac99586af10cf17096c38795683c8ac\", \"./.next-dev/cache/fetch-cache/af539672089a839cbf106db84ca9fe0bcbbc086087b2bffa9f9135406ee1fe45\", \"./.next-dev/cache/fetch-cache/d3a8a6a4860f1a6b0cf2dfaa686f1fa28f16fac39bd7d081492e85978c6d08d6\", \"./.next-dev/cache/fetch-cache/797fa86286f9e356f133586338e83feea450cab93ca7af7c35570cbf6aab45f1\", \"./.next-dev/cache/fetch-cache/5c901ae19c95fb637cbb13fc6c4254b3204b0591668ff80265793c8a58fab8a8\", \"./.next-dev/cache/fetch-cache/a163f1db5a9d00d8a7bb9183fffd1e755edf47cadae4b6290b9d6c8ab8341991\", \"./.next-dev/cache/fetch-cache/d5526e9914304291b2d77ae7012bc1a4cdd8bf6dcdbabf854c1e03a1f51ac869\", \"./.next-dev/cache/fetch-cache/e04556eca530aae2c23e2fba4c7a7254c7261b520f7d05e2b3ebb1887a80bd5d\", \"./.next-dev/cache/fetch-cache/9d60547dd126d32cd6847738d89ce50b37cb4e6b0ca8474be78d61739b2f4c3d\", \"./.next-dev/cache/fetch-cache/b78e548c551fadb3d3c3b240deba3c59b83830facd1aa2cd6276bf91451963c3\", \"./.next-dev/cache/fetch-cache/7f9a7084588239c3484d4e3e46998367c685464fa0e46f72771829998689282a\", \"./.next-dev/cache/fetch-cache/e8d458c4d8fa2af1fc447e24f7b61d848aaa4f6380f231158222f36dce70af44\", \"./.next-dev/cache/fetch-cache/630b88985a241c98a3f20ef88d7219122393df0b20da2015cbb30ac8588c1041\", \"./.next-dev/cache/fetch-cache/71ce07829866f64360a590a27b1f8d324933e2c5d0ca1c4c87e79bf5d747f539\", \"./.next-dev/cache/fetch-cache/9f13a4fad45c862338122d08c2206fe01c8e927088e9d384f83f62108023ca49\", \"./.next-dev/cache/fetch-cache/c48bedfc554bda9557b234a749e40e2476bdb2ceb7a1dee3d317b42171ca199a\", \"./.next-dev/cache/fetch-cache/84c1fcc69532dafde1cb2621b430aeca354b194f0168886bb51219f4100e3521\", \"./.next-dev/cache/fetch-cache/ad3b2a0173ff51bf00b798e82e9313731fe5de416dcec07fda0043b71fae1d10\", \"./.next-dev/cache/fetch-cache/6fb1ee0a3fa9e2246bf7fb01688b2beb957e15f9ee680c14f49575b1062d36f0\", \"./.next-dev/cache/fetch-cache/88b403cb608c3c131b2e1426aab5c683a14fb032817029bb835dd44ca18d31ee\", \"./.next-dev/cache/fetch-cache/309e6b2701f38de693bb0e6b6aef3e8edf6bc28f7443ed3b1da62186a6d6ad2d\", \"./.next-dev/cache/fetch-cache/190da9903c3155909c6e567911359c9473de1fc4022d800e89dad1a2408c411a\", \"./.auth/.claude.json\", \"./.auth/history.jsonl\", \"./.auth/projects/F--test-mama-v1-2/37b5d7c3-938e-46fb-bb7d-4ff674c10d6e.jsonl\", \"./.auth/backups/.claude.json.backup.1778478787071\"], \"truncated\": true}\n\n[Hint: Results truncated. Use offset=100 to see more, or narrow with a more specific pattern or file_glob.]\n\n[Subdirectory context discovered: /mnt/f/CLAUDE.md]\n## 제미나이CLI에 MCP 설치해주기\n공통 주의사항\n1. 현재 사용 환경을 확인할 것. 모르면 사용자에게 물어볼 것. \n2. OS(윈도우,리눅스,맥) 및 환경들(파워셀,명령프롬프트등)을 파악해서 그에 맞게 세팅할 것. 모르면 사용자에게 물어볼 것.\n3. user 스코프로 설치 및 적용할것\n4. 특정 MCP 설치시, 바로 설치하지 말고, WebSearch 도구로 해당 MCP의 공식 사이트 확인하고 현재 OS 및 환경 매치하여, 공식 설치법부터 확인할 것\n5. 공식 사이트 확인 후에는 context7 MCP 존재하는 경우, context7으로 다시 한번 확인할 것\n6. MCP 설치 후, 이 명령어를 터미널로 실행하여, MCP 정상 작동 여부를 확인할 것: gemini -e coder-agent -y -p \"/mcp\" \n7. 설정 시, API KEY 환경 변수 설정이 필요한 경우, 가상의 API 키로 디폴트로 설치 및 설정 후, 올바른 API 키 정보를 입력해야 함을 사용자에게 알릴 것\n8. Mysql MCP와 같이 특정 서버가 구동중 상태여만 정상 작동한 것은 에러가 나도 재설치하지 말고, 정상 구동을 위한 조건을 사용자에게 알릴 것\n9. 현재 제미나이CLI가 실행되는 환경이야.\n10. 설치 요청 받은 MCP만 설치하면 돼. 혹시 이미 설치된 다른 MCP 에러 있어도, 그냥 둘 것\n11. 일단, 터미널에서 설치하려는 MCP 작동 성공한 경우, 성공 시의 인자 및 환경 변수 이름을 활용해, 올바른 위치의 json 파일에 MCP 설정을 직접할 것\n\n윈도우에서의 주의사항\n1. 설정 파일 직접 세팅시, Windows 경로 구분자는 백슬래시(\\)이며, JSON 내에서는 반드시 이스케이프 처리(\\\\\\\\)해야 해.\n** OS 공통 주의사항**\n1. Node.js가 %PATH%에 등록되어 있는지, 버전이 최소 v18 이상인지 확인할 것\n2. npx -y 옵션을 추가하면 버전 호환성 문제를 줄일 수 있음\n\n### MCP 서버 설치 순서\n\n1. 기본 설치\n\tnpx나 pip를 사용해 설치할 것\n\n\t(npm/npx 패키지를 찾을 수 없는 경우) pm 전역 설치 경로 확인 : npm config get prefix\n\t공식 사이트에서 권장되는 방법을 확인한 후, npm, pip, uvx, pip 등으로 직접 설치할 것\n\n\t#### uvx 명령어를 찾을 수 없는 경우\n\t# uv 설치 (Python 패키지 관리자)\n\tcurl -LsSf https://astral.sh/uv/install.sh | sh\n\n\t#### npm/npx 패키지를 찾을 수 없는 경우\n\t# npm 전역 설치 경로 확인\n\tnpm config get prefix\n\n\n\t#### uvx 명령어를 찾을 수 없는 경우\n\t# uv 설치 (Python 패키지 관리자)\n\tcurl -LsSf https://astral.sh/uv/install.sh | sh\n\n\n2. 설정 파일 수정하기\n   설정파일위치   \n   A. 윈도우:   C:\\Users\\<사용자이름>\\.gemini\\settings.json\n   B. macOS/Linux 환경: ~/.gemini/settings.json\n\n   settings.json에서 mcpServers 항목을 편집하여 설정할 것\n\n\t설정 예시\n\n\t\t1. npx 사용\n\n\t\t{\n\t\t  \"youtube-mcp\": {\n\t\t    \"type\": \"stdio\",\n\t\t    \"command\": \"npx\",\n\t\t    \"args\": [\"-y\", \"youtube-data-mcp-server\"],\n\t\t    \"env\": {\n\t\t      \"YOUTUBE_API_KEY\": \"YOUR_API_KEY_HERE\",\n\t\t      \"YOUTUBE_TRANSCRIPT_LANG\": \"ko\"\n\t\t    }\n\t\t  }\n\t\t}\n\n\n\t\t2. cmd.exe 래퍼 + 자동 동의)\n\t\t{\n\t\t  \"mcpServers\": {\n\t\t    \"mcp-installer\": {\n\t\t      \"command\": \"cmd.exe\",\n\t\t      \"args\": [\"/c\", \"npx\", \"-y\", \"@anaisbetts/mcp-installer\"],\n\t\t      \"type\": \"stdio\"\n\t\t    }\n\t\t  }\n\t\t}\n\n\t\t3. 파워셀예시\n\t\t{\n\t\t  \"command\": \"powershell.exe\",\n\t\t  \"args\": [\n\t\t    \"-NoLogo\", \"-NoProfile\",\n\t\t    \"-Command\", \"npx -y @anaisbetts/mcp-installer\"\n\t\t  ]\n\t\t}\n\n\t\t4. npx 대신 node 지정\n\t\t{\n\t\t  \"command\": \"node\",\n\t\t  \"args\": [\n\t\t    \"%APPDATA%\\\\npm\\\\node_modules\\\\@anaisbetts\\\\mcp-installer\\\\dist\\\\index.js\"\n\t\t  ]\n\t\t}\n\n\t\t5. args 배열 설계 시 체크리스트\n\t\t토큰 단위 분리: \"args\": [\"/c\",\"npx\",\"-y\",\"pkg\"] 와\n\t\t\t\"args\": [\"/c\",\"npx -y pkg\"] 는 동일해보여도 cmd.exe 내부에서 따옴표 처리 방식이 달라질 수 있음. 분리가 안전.\n\t\t경로 포함 시: JSON에서는 \\\\ 두 번. 예) \"C:\\\\tools\\\\mcp\\\\server.js\".\n\t\t환경변수 전달:\n\t\t\t\"env\": { \"UV_DEPS_CACHE\": \"%TEMP%\\\\uvcache\" }\n\t\t타임아웃 조정: 느린 PC라면 MCP_TIMEOUT 환경변수로 부팅 최대 시간을 늘릴 수 있음 (예: 10000 = 10 초) \n\n\t\tMCP 설정에 어려움이 있을때, cmd나 node 등으로 다음과 같이 대체해 볼것:\n\t\t{\n\t\t\"mcpServers\": {\n\t\t      \"context7\": {\n\t\t\t \"command\": \"cmd\",\n\t\t\t \"args\": [\"/c\", \"npx\", \"-y\", \"@upstash/context7-mcp@latest\"]\n\t\t      }\n\t\t   }\n\t\t}\n\n    \n\n3. 설치 후 정상 설치 여부 확인하기\t\n\t gemini -e coder-agent -y -p \"/mcp\" -> 이 명령어를 터미널로 수행 후 디버깅 정보를 최대 2분 동안 관찰한 후, 그 동안의 디버그 메시지(에러 시 관련 내용이 출력됨)를 확인하고 \n         MCP 실제 작동여부를 반드시 확인할 것\n\n\n\t\t\n** MCP 서버 제거가 필요할 때 예시: **\n특정 MCP 서버 설정을 삭제하려면, 설정 파일의 해당 MCP 항목을 지우고 저장하면 됩니다.\n\n[Subdirectory context discovered: /mnt/f/test/CLAUDE.md]\n# CLAUDE.md\n\n이 파일은 Claude Code (claude.ai/code)가 이 저장소에서 코드 작업을 할 때 필요한 가이드를 제공합니다.\n\n## 저장소 구조\n\n이 저장소는 네 개의 독립적인 프로젝트를 포함합니다:\n\n1. **30/** - 케어포 GUI 출석 모니터 애플리케이션 (Python/CustomTkinter)\n2. **carefor-attendance/** - 케어포 사이트 출석 확인 프로그램 (Python/Node.js)\n3. **carefor-webapp-2025-06-22/** - 케어포 수급자 현황 관리 웹 애플리케이션 (Streamlit)\n4. **youtube-summarizer/** - YouTube 영상 요약 웹 서비스 (Node.js)\n\n각 프로젝트는 독립적이며 고유한 의존성과 설정을 가지고 있습니다.\n\n5. **cheongdam-center/** - 청담재활주간보호센터 랜딩페이지 (HTML/CSS/JavaScript) + 블로그 연동\n\n## 주요 개발 명령어\n\n### 케어포 GUI 출석 모니터 (30/)\n\n```bash\ncd 30/\npip install customtkinter selenium\npython carefor_gui_simple.py  # GUI 애플리케이션 실행\n```\n\n**실행 파일 빌드:**\n```bash\ncd 30/\n# PyInstaller로 실행파일 생성 (spec 파일 사용)\npyinstaller carefor_gui_simple.spec\n```\n\n### 케어포 출석 체크 프로그램 (carefor-attendance/)\n\n**Python 버전:**\n```bash\ncd carefor-attendance/\npip install -r requirements.txt\nplaywright install\npython run.py  # config.py의 설정 사용\npython carefor_checker.py  # 수동 로그인 정보 입력\n```\n\n**Node.js 버전:**\n```bash\ncd carefor-attendance/\nnpm install\nnpm start  # node run.js 실행\n```\n\n### 케어포 웹 애플리케이션 (carefor-webapp-2025-06-22/)\n\n```bash\ncd carefor-webapp-2025-06-22/\npip install -r requirements.txt\npython -m playwright install chromium\npython run.py  # 자동 설치 및 실행\n# 또는 수동 실행:\nstreamlit run main.py\n```\n\n**옵션과 함께 실행:**\n```bash\npython run.py --port 8502 --debug --no-browser\n```\n\n### YouTube 요약기 (youtube-summarizer/)\n\n```bash\ncd youtube-summarizer/\nnpm install\nnpm start  # 프로덕션 서버\nnpm run dev  # nodemon을 사용한 개발 서버\n```\n\n### 청담재활 랜딩페이지 + 블로그 연동 (cheongdam-center/)\n\n```bash\ncd cheongdam-center/\n# 필수 패키지 설치\nnpm install express xml2js cheerio cors\n\n# 블로그 서버 실행 (블로그 연동 + 웹서버)\nnode blog-server.js\n# 또는 커스텀 포트로 실행\nPORT=8081 node blog-server.js\n```\n\n**블로그 이미지 자동 추출 시스템:**\n```bash\ncd cheongdam-center/\n# 개별 포스트 이미지 테스트\ncurl \"http://localhost:8081/api/test-screenshot?url=https://blog.naver.com/chungdam311/[포스트ID]\"\n\n# 이미지 추출 과정 테스트\nnode test-image-extraction.js\n\n# 썸네일 파일 확인\ncurl http://localhost:8081/api/thumbnails\n```\n\n## 아키텍처 개요\n\n### 케어포 GUI 출석 모니터 아키텍처 (30/)\n\n**데스크톱 GUI 애플리케이션**으로 실시간 출석 모니터링 기능 제공:\n\n- **GUI 프레임워크**: CustomTkinter를 사용한 현대적 데스크톱 인터페이스\n- **웹 자동화**: Selenium WebDriver를 통한 carefor.or.kr 사이트 자동화\n- **다중 모드 지원**: 출석, 외출, 직원 휴무 상태 실시간 모니터링\n- **자동 로그인**: 쿠키 기반 세션 유지 및 자동 재로그인\n- **실시간 업데이트**: 사용자 정의 간격으로 자동 새로고침\n- **날짜 네비게이션**: 이전/다음 날짜 조회 기능\n\n**핵심 컴포넌트:**\n- `carefor_gui_simple.py`: 메인 GUI 애플리케이션\n- `data_collector.py`: 웹 스크래핑과 데이터 수집 엔진\n- `login_manager.py`: 로그인 정보 관리 및 세션 유지\n- `config.py`: 상세한 설정 및 XPath/CSS 셀렉터 관리\n- `.spec` 파일들: PyInstaller 실행파일 빌드 설정\n\n**주요 기능:**\n- 실시간 출석/결석/외출 상태 표시\n- 팝업 데이터에서 평균 입소자 수 자동 추출\n- 드래그 제스처로 모드 전환 (출석 ↔ 외출)\n- 헤드리스/GUI 브라우저 모드 전환\n- 세션 데이터 암호화 및 다중 사용자 지원\n\n### 케어포 프로젝트 아키텍처\n\n두 케어포 프로젝트 모두 **Playwright를 사용한 웹 스크래핑**으로 carefor.or.kr 사이트를 자동화합니다:\n\n- **인증 플로우**: 기관ID, 사용자명, 비밀번호로 로그인\n- **데이터 추출**: 수급자들의 출석/결석 현황 스크래핑\n- **데이터 처리**: 결과 포맷팅 및 표시 (CLI 출력 또는 웹 대시보드)\n\n**핵심 컴포넌트:**\n- `carefor_scraper.py` / `carefor_checker.py`: 핵심 스크래핑 로직\n- `config.py`: 웹사이트 요소를 위한 설정 및 CSS 셀렉터\n- `main.py` (webapp): 날짜 네비게이션과 실시간 업데이트가 있는 Streamlit UI\n- 브라우저 자동화는 기본적으로 헤드리스 모드로 실행\n\n### YouTube 요약기 아키텍처\n\nYouTube 비디오를 처리하는 **Express.js API 서버**:\n\n- **프론트엔드**: 바닐라 JavaScript가 포함된 정적 HTML\n- **백엔드**: Node.js/Express API 엔드포인트\n- **AI 통합**: 텍스트 요약을 위한 Google Gemini API\n- **자막 추출**: 자막 데이터를 위한 youtube-transcript 라이브러리\n\n**요청 플로우:**\n1. 사용자가 웹 폼을 통해 YouTube URL 제출\n2. 서버가 youtube-transcript를 사용하여 비디오 자막 추출\n3. 자막이 요약을 위해 Gemini AI로 전송\n4. AI 생성 요약이 클라이언트에 반환\n\n### 청담재활 랜딩페이지 아키텍처\n\n**정적 웹사이트**로 청담재활주간보호센터 소개 및 블로그 연동:\n\n- **프론트엔드**: HTML5/CSS3/JavaScript 정적 웹사이트\n- **블로그 연동**: 네이버 블로그 RSS 피드 파싱 및 이미지 자동 처리\n- **반응형 디자인**: 모바일/태블릿/데스크톱 최적화\n- **이미지 자동화**: Playwright를 통한 블로그 이미지 자동 크롭\n\n**핵심 컴포넌트:**\n- `index.html`: 메인 랜딩페이지 구조\n- `css/style.css`: 반응형 스타일시트 및 애니메이션\n- `js/script.js`: 인터랙션 및 슬라이더 기능\n- `auto-blog-images.js`: 블로그 이미지 자동 크롭 도구\n- `QUICK-COMMANDS.md`: 빠른 작업 가이드\n\n**주요 기능:**\n- 히어로 섹션 배경 이미지 및 애니메이션\n- 서비스 슬라이더 (물리치료, 인지치료, 일상생활지원, 여가활동)\n- 실시간 블로그 연동 (\"센터 소식\" 섹션)\n- 자동 이미지 크롭 및 품질 최적화\n- 반응형 네비게이션 및 모바일 최적화\n\n## 설정 관리\n\n### 환경 변수\n\n**케어포 프로젝트:**\n- 자격 증명은 `config.py` (Python)에 저장하거나 프롬프트 기반 입력\n- 웹앱용 `.env` 파일의 환경 설정\n- 브라우저 자동화 설정 (헤드리스 모드, 타임아웃)\n\n**YouTube 요약기:**\n- `.env` 파일에 `GEMINI_API_KEY` 필수\n- 명령줄 인수를 통한 서버 포트 및 호스트 설정\n\n### 사이트 구조 의존성\n\n케어포 프로젝트는 `config.py`의 특정 CSS 셀렉터에 의존합니다. 케어포 웹사이트 구조가 변경되면 `CAREFOR_SELECTORS`를 업데이트하세요:\n\n```python\nCAREFOR_SELECTORS = {\n    \"login\": {\n        \"institution_id\": \"#institution_id\",\n        \"username\": \"#username\", \n        \"password\": \"#password\",\n        \"login_button\": \"#login_button\"\n    }\n    # 데이터 추출을 위한 추가 셀렉터\n}\n```\n\n## 개발 워크플로우\n\n### 웹 스크래핑 변경사항 테스트\n\n1. `--debug` 플래그로 실행하여 브라우저 자동화 확인\n2. 상세한 실행 로그를 위해 `logs/` 디렉토리 확인\n3. 웹사이트 구조 변경 시 `config.py`의 셀렉터 업데이트\n4. 데이터 일관성을 위해 다양한 날짜 범위로 테스트\n\n### API 키 관리\n\n- API 키를 저장소에 커밋하지 마세요\n- 필요한 환경 변수를 문서화하기 위해 `.env.example` 파일 사용\n- 실수로 노출된 경우 API 키 재생성\n\n### 브라우저 자동화 설정\n\nPlaywright는 브라우저 설치가 필요합니다:\n```bash\npython -m playwright install chromium  # Python 프로젝트용\nnpx playwright install  # Node.js 프로젝트용\n```\n\n## 배포 고려사항\n\n### 케어포 웹앱\n- Streamlit에서 실행 (기본 포트 8501)\n- 사용자 정의 호스트/포트 설정 지원\n- 브라우저 자동화는 GUI 환경 또는 적절한 헤드리스 설정 필요\n\n### YouTube 요약기\n- Express 서버 (기본 포트 3000)\n- 충분한 할당량이 있는 활성 Gemini API 키 필요\n- 크로스 오리진 요청을 위한 CORS 활성화\n\n## 보안 참고사항\n\n- 모든 프로젝트는 자격 증명을 안전하게 처리 (하드코딩된 비밀 정보 없음)\n- 웹 스크래핑은 웹사이트 이용약관을 준수\n- API 키는 환경 변수에만 저장\n- 사용자 제공 URL 및 데이터에 대한 입력 검증 구현\n\n## 청담재활 랜딩페이지 작업 가이드\n\n### 🖼️ 블로그 대표 이미지 자동 추출 시스템 (ImageDownloadService)\n\n#### 핵심 원리\n사용자가 요청한 \"블로그 글의 첫 번째 대표 이미지\"를 정확히 추출하기 위한 시스템입니다.\n\n#### 작업 완료된 구현 방식 (2025.07.04)\n\n**1. 문제 상황:**\n- Puppeteer가 WSL 환경에서 시스템 라이브러리 문제로 작동하지 않음\n- 이전에는 90x90 크기의 프로필 아이콘이 추출되고 있었음\n- 사용자는 블로그 글 **본문의 첫 번째 큰 이미지**를 원했음\n\n**2. 해결 방법:**\n```javascript\n// image-download-service.js 핵심 로직\n\n// Step 1: 본문 콘텐츠 영역 우선 탐색\nconst contentSelectors = [\n    '.se-main-container img', // 스마트에디터 3.0 (1순위)\n    '.post-view img',         // 일반 포스트 뷰\n    '.entry-content img',     // 엔트리 콘텐츠\n    '#postViewArea img',      // 포스트 뷰 영역\n    '.post_ct img',           // 포스트 컨텐츠\n    '.se-component img',      // 스마트에디터 컴포넌트\n    '.se-image-resource img', // 이미지 리소스\n    'img'                     // 모든 이미지 (마지막 대안)\n];\n\n// Step 2: 불필요한 이미지 필터링\nif (!src.includes('profile') && \n    !src.includes('icon') && \n    !src.includes('logo') &&\n    !src.includes('banner') &&\n    !alt.includes('프로필') &&\n    !alt.includes('아이콘') &&\n    parseInt(width) !== 90 &&  // 90x90 아이콘 제외\n    parseInt(height) !== 90) {\n\n// Step 3: 고품질 이미지 URL 변환\nif (imageUrl.includes('?type=w80_blur')) {\n    imageUrl = imageUrl.replace('?type=w80_blur', '?type=w773');\n} else if (imageUrl.includes('type=w80')) {\n    imageUrl = imageUrl.replace('type=w80', 'type=w773');\n}\n```\n\n**3. 결과 검증:**\n- ✅ 이미지 크기: 5KB → 88-114KB (실제 콘텐츠 이미지로 증명)\n- ✅ 추출 방식: 본문 첫 번째 이미지 우선 선택\n- ✅ 품질: `type=w773` 파라미터로 고해상도 추출\n\n#### 🔧 구현 파일 구조\n```\ncheongdam-center/\n├── blog-server.js              # 메인 서버 (ImageDownloadService 사용)\n├── image-download-service.js   # 핵심 이미지 추출 로직\n├── test-image-extraction.js    # 테스트 스크립트\n└── images/thumbnails/          # 추출된 이미지 저장 폴더\n```\n\n#### 🚀 문제 발생 시 대응 방법\n\n**이미지가 추출되지 않는 경우:**\n```bash\n# 1. 개별 포스트 테스트\nnode test-image-extraction.js\n\n# 2. 서버 로그 확인\nPORT=8081 node blog-server.js\n# 콘솔에서 \"🔍 블로그 페이지 분석\" 메시지 확인\n\n# 3. 기존 이미지 삭제 후 재추출\nrm -f images/thumbnails/*.jpg\ncurl \"http://localhost:8081/api/test-screenshot?url=https://blog.naver.com/chungdam311/[포스트ID]\"\n```\n\n**네이버 블로그 구조 변경 시:**\n```javascript\n// image-download-service.js에서 셀렉터 추가/수정\nconst contentSelectors = [\n    '.새로운-셀렉터 img',     // 새로운 구조\n    '.se-main-container img', // 기존 구조\n    // ... 기타 셀렉터들\n];\n```\n\n### 빠른 작업을 위한 Claude 요청 패턴\n\n#### ✅ 효율적인 요청 예시들\n\n**블로그 이미지 추출 문제 해결:**\n```\n\"블로그 이미지가 안 나와요. test-image-extraction.js로 테스트해서 \n어떤 이미지가 추출되는지 확인하고 image-download-service.js 수정해줘\"\n```\n\n**새로운 블로그 추가 시:**\n```\n\"새 블로그 https://blog.naver.com/새블로그를 추가하고 \n이미지 추출이 제대로 되는지 테스트해줘\"\n```\n\n**레이아웃 변경:**\n```\n\"서비스 섹션을 7:3 비율로 변경하고 모바일에서도 확인해줘\"\n```\n\n**전체 기능 구현:**\n```\n\"블로그 연동 완전 자동화:\n- RSS 파싱\n- 이미지 자동 추출 (본문 첫 번째 이미지)\n- HTML 업데이트\n- 서버 재시작해서 확인\"\n```\n\n**이미지 추출 품질 개선:**\n```\n\"블로그 이미지가 작거나\n\n[...truncated CLAUDE.md: 22,506 chars total]",
+      "tool_call_id": "chatcmpl-tool-bb08c9fa36dc2f11"
+    },
+    {
+      "role": "assistant",
+      "content": "We are to analyze the current working directory and suggest 3 things to implement next, without modifying any files.\n We have seen a lot of files, but note that the current working directory is /mnt/f/test/mama-v1.2.\n\n Let's first look at the structure of the project by examining some key files and directories.\n\n However, note that the user said: \"현재 작업 폴더를 분석하고 제안만 해줘. 파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\"\n\n We are only to suggest 3 things to implement next.\n\n We have seen in the search_files output that there are many files, including:\n   - .next-dev/ (build artifacts)\n   - .auth/ (authentication data)\n   - app/ (likely the Next.js app directory)\n   - components/ (React components)\n   - lib/ (library code)\n   - backup/ (backups)\n\n Also, we saw a CLAUDE.md in the root and in /mnt/f/test/CLAUDE.md (which is actually the same as the one we are in?).\n\n Let's look at the app directory to understand the structure better.\n\n We'll do a quick search for the app directory and see what's inside.\n\n But note: we are not to modify anything, just read and suggest.\n\n Let's use search_files to look for the app directory and then list its contents.\n\n However, we can also use the terminal tool to run a simple ls, but note that we are to avoid execution commands? \n Actually, the user said: \"파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\" \n But we are allowed to use the tools to read files and search, as long as we don't modify.\n\n We can use the terminal tool to run a non-modifying command like `ls` or `find`? \n However, the user might consider that as an execution command. \n\n Alternatively, we can use the search_files tool to list files and directories.\n\n Let's do:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\".\", limit=20)\n\n But note: the pattern for file search is a glob. We can use:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\".\", limit=20)\n\n However, the tool says for target='files': \"Find files by glob pattern (e.g., '*config*')\"\n\n So we can do:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\"",
+      "reasoning": "We are to analyze the current working directory and suggest 3 things to implement next, without modifying any files.\n We have seen a lot of files, but note that the current working directory is /mnt/f/test/mama-v1.2.\n\n Let's first look at the structure of the project by examining some key files and directories.\n\n However, note that the user said: \"현재 작업 폴더를 분석하고 제안만 해줘. 파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\"\n\n We are only to suggest 3 things to implement next.\n\n We have seen in the search_files output that there are many files, including:\n   - .next-dev/ (build artifacts)\n   - .auth/ (authentication data)\n   - app/ (likely the Next.js app directory)\n   - components/ (React components)\n   - lib/ (library code)\n   - backup/ (backups)\n\n Also, we saw a CLAUDE.md in the root and in /mnt/f/test/CLAUDE.md (which is actually the same as the one we are in?).\n\n Let's look at the app directory to understand the structure better.\n\n We'll do a quick search for the app directory and see what's inside.\n\n But note: we are not to modify anything, just read and suggest.\n\n Let's use search_files to look for the app directory and then list its contents.\n\n However, we can also use the terminal tool to run a simple ls, but note that we are to avoid execution commands? \n Actually, the user said: \"파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\" \n But we are allowed to use the tools to read files and search, as long as we don't modify.\n\n We can use the terminal tool to run a non-modifying command like `ls` or `find`? \n However, the user might consider that as an execution command. \n\n Alternatively, we can use the search_files tool to list files and directories.\n\n Let's do:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\".\", limit=20)\n\n But note: the pattern for file search is a glob. We can use:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\".\", limit=20)\n\n However, the tool says for target='files': \"Find files by glob pattern (e.g., '*config*')\"\n\n So we can do:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\"",
+      "finish_reason": "length",
+      "reasoning_content": "We are to analyze the current working directory and suggest 3 things to implement next, without modifying any files.\n We have seen a lot of files, but note that the current working directory is /mnt/f/test/mama-v1.2.\n\n Let's first look at the structure of the project by examining some key files and directories.\n\n However, note that the user said: \"현재 작업 폴더를 분석하고 제안만 해줘. 파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\"\n\n We are only to suggest 3 things to implement next.\n\n We have seen in the search_files output that there are many files, including:\n   - .next-dev/ (build artifacts)\n   - .auth/ (authentication data)\n   - app/ (likely the Next.js app directory)\n   - components/ (React components)\n   - lib/ (library code)\n   - backup/ (backups)\n\n Also, we saw a CLAUDE.md in the root and in /mnt/f/test/CLAUDE.md (which is actually the same as the one we are in?).\n\n Let's look at the app directory to understand the structure better.\n\n We'll do a quick search for the app directory and see what's inside.\n\n But note: we are not to modify anything, just read and suggest.\n\n Let's use search_files to look for the app directory and then list its contents.\n\n However, we can also use the terminal tool to run a simple ls, but note that we are to avoid execution commands? \n Actually, the user said: \"파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\" \n But we are allowed to use the tools to read files and search, as long as we don't modify.\n\n We can use the terminal tool to run a non-modifying command like `ls` or `find`? \n However, the user might consider that as an execution command. \n\n Alternatively, we can use the search_files tool to list files and directories.\n\n Let's do:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\".\", limit=20)\n\n But note: the pattern for file search is a glob. We can use:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\".\", limit=20)\n\n However, the tool says for target='files': \"Find files by glob pattern (e.g., '*config*')\"\n\n So we can do:\n\n   search_files(pattern=\"app/\", target=\"files\", path=\""
+    },
+    {
+      "role": "user",
+      "content": "[System: Your previous response was truncated by the output length limit. Continue exactly where you left off. Do not restart or repeat prior text. Finish the answer directly.]"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "We need to continue from where we left off. The previous response was truncated. We were in the middle of suggesting 3 things to implement next.\n\nLet me recall: We were analyzing the project structure and had just started to look at the app directory.\n\nWe should finish the analysis and then suggest 3 things.\n\nBut note: the user said to only suggest 3 things and not to modify any files.\n\nWe have already done some analysis. Let's now try to complete the analysis and then suggest.\n\nWe can use the tools to gather more information without modifying.\n\nLet's look at the app directory structure.\n\nWe'll use search_files to list files under app/.\n\n",
+      "finish_reason": "tool_calls",
+      "reasoning_content": "We need to continue from where we left off. The previous response was truncated. We were in the middle of suggesting 3 things to implement next.\n\nLet me recall: We were analyzing the project structure and had just started to look at the app directory.\n\nWe should finish the analysis and then suggest 3 things.\n\nBut note: the user said to only suggest 3 things and not to modify any files.\n\nWe have already done some analysis. Let's now try to complete the analysis and then suggest.\n\nWe can use the tools to gather more information without modifying.\n\nLet's look at the app directory structure.\n\nWe'll use search_files to list files under app/.\n\n",
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-a767d6e51e80daf5",
+          "call_id": "chatcmpl-tool-a767d6e51e80daf5",
+          "response_item_id": "fc_chatcmpl-tool-a767d6e51e80daf5",
+          "type": "function",
+          "function": {
+            "name": "search_files",
+            "arguments": "{\"pattern\": \"app/\", \"target\": \"files\", \"path\": \".\", \"limit\": 20}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "name": "search_files",
+      "content": "{\"total_count\": 20, \"files\": [\"./.hermes-workspace/ignored.json\", \"./.hermes-workspace/memory.md\", \"./.hermes-workspace/instructions.md\", \"./.hermes-workspace/workspace.json\", \"./.next-dev/trace\", \"./.next-dev/app-build-manifest.json\", \"./.next-dev/build-manifest.json\", \"./.next-dev/react-loadable-manifest.json\", \"./.next-dev/static/webpack/webpack.815163a0103f82c8.hot-update.js\", \"./.next-dev/static/webpack/815163a0103f82c8.webpack.hot-update.json\", \"./.next-dev/static/webpack/app/layout.815163a0103f82c8.hot-update.js\", \"./.next-dev/static/webpack/633457081244afec._.hot-update.json\", \"./.next-dev/static/chunks/webpack.js\", \"./.next-dev/static/chunks/app/_not-found/page.js\", \"./.next-dev/static/chunks/app/layout.js\", \"./.next-dev/static/chunks/app/global-error.js\", \"./.next-dev/static/chunks/app/error.js\", \"./.next-dev/static/chunks/app/not-found.js\", \"./.next-dev/static/chunks/app/page.js\", \"./.next-dev/static/chunks/_app-pages-browser_components_ChatBrowser_jsx.js\"], \"truncated\": true}\n\n[Hint: Results truncated. Use offset=20 to see more, or narrow with a more specific pattern or file_glob.]",
+      "tool_call_id": "chatcmpl-tool-a767d6e51e80daf5"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "We need to see the actual app directory structure, not just the .next-dev build outputs.\n Let's search for files under app/ but exclude .next-dev.\n We can use a pattern that matches app/ but not .next-dev/app/.\n Alternatively, we can search for files with target='files' and pattern='app/**' but the tool might not support globstars.\n Let's try to search for files in the app directory by using path='app' and pattern='*'.\n",
+      "finish_reason": "tool_calls",
+      "reasoning_content": "We need to see the actual app directory structure, not just the .next-dev build outputs.\n Let's search for files under app/ but exclude .next-dev.\n We can use a pattern that matches app/ but not .next-dev/app/.\n Alternatively, we can search for files with target='files' and pattern='app/**' but the tool might not support globstars.\n Let's try to search for files in the app directory by using path='app' and pattern='*'.\n",
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-a9a0c408ee70bc1b",
+          "call_id": "chatcmpl-tool-a9a0c408ee70bc1b",
+          "response_item_id": "fc_chatcmpl-tool-a9a0c408ee70bc1b",
+          "type": "function",
+          "function": {
+            "name": "search_files",
+            "arguments": "{\"limit\": 20, \"path\": \"app\", \"pattern\": \"*\", \"target\": \"files\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "name": "search_files",
+      "content": "{\"total_count\": 20, \"files\": [\"app/api/auth/route.js\", \"app/api/auth/route.js.before_login_v2_20260510-192312.bak\", \"app/api/auth/login/route.js\", \"app/api/auth/route.js.before_login_20260510-191712.bak\", \"app/api/agent/run/route.js\", \"app/api/agent/run/route.js.before_retry_rollback_20260511-065817.bak\", \"app/api/agent/run/route.js.before_codex_isolation_20260511-072101.bak\", \"app/api/agent/run/route.js.before_resolveauth_20260510-134332.bak\", \"app/api/agent/run/route.js.bak_429fix\", \"app/api/agent/run/route.js.bak_20260507_200643\", \"app/api/agent/run/route.js.bak_credfix_20260507_151506\", \"app/api/agent/run/route.js.bak_bare_20260507_151231\", \"app/api/agent/run/route.js.bak_anthfix_20260507_150943\", \"app/api/agent/run/route.js.bak_rmflag_20260507_150548\", \"app/api/agent/run/route.js.bak_tdzfix_20260507_150358\", \"app/api/agent/run/route.js.bak2_20260506_105711\", \"app/api/agent/run/route.js.bak_20260506_073146\", \"app/api/agent/run/route.js.before_progress\", \"app/api/agent/run/route.js.before_chat_history\", \"app/api/agent/backup/route.js\"], \"truncated\": true}\n\n[Hint: Results truncated. Use offset=20 to see more, or narrow with a more specific pattern or file_glob.]",
+      "tool_call_id": "chatcmpl-tool-a9a0c408ee70bc1b"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "We need to suggest 3 things to implement next based on the analysis of the project folder.\n We are not to modify any files, just suggest.\n\n From the AGENTS.md and the context, we see this is a Multi AI Chat project with:\n   - Chat via /api/chat (direct LLM API)\n   - Agent via /api/agent/run (OpenClaude CLI bridge)\n   - Backup via /api/agent/backup\n\n We also saw in the search results that there are many backup files for route.js, indicating active development.\n\n Let's look at the structure of the app directory more broadly.\n\n We can also look at the components and lib directories.\n\n However, note that the user wants only 3 suggestions.\n\n Let's think about what might be missing or could be improved:\n\n 1. The AGENTS.md mentions R12: `invalidateIndex()` 호출 금지. `saveSession()` / `searchSessions()` 사용.\n    We might want to check if there are any places where `invalidateIndex()` is being used and suggest removing it.\n\n 2. The AGENTS.md also mentions R08: API key client exposure forbidden. We should ensure that API keys are only used in server-side routes.\n\n 3. We saw that there are many backup files for the agent/run route. Perhaps we can suggest cleaning up old backups or implementing a backup retention policy.\n\n 4. The project uses Next.js 14. We might suggest looking into the app directory structure for potential improvements.\n\n 5. We saw a skill for hermes-agent. Perhaps we can suggest improving the agent's capabilities.\n\n However, we are to suggest 3 things to implement next.\n\n Let's first look at the app directory to see what routes exist.\n\n We'll do a search for route.js files in the app directory.\n\n",
+      "finish_reason": "tool_calls",
+      "reasoning_content": "We need to suggest 3 things to implement next based on the analysis of the project folder.\n We are not to modify any files, just suggest.\n\n From the AGENTS.md and the context, we see this is a Multi AI Chat project with:\n   - Chat via /api/chat (direct LLM API)\n   - Agent via /api/agent/run (OpenClaude CLI bridge)\n   - Backup via /api/agent/backup\n\n We also saw in the search results that there are many backup files for route.js, indicating active development.\n\n Let's look at the structure of the app directory more broadly.\n\n We can also look at the components and lib directories.\n\n However, note that the user wants only 3 suggestions.\n\n Let's think about what might be missing or could be improved:\n\n 1. The AGENTS.md mentions R12: `invalidateIndex()` 호출 금지. `saveSession()` / `searchSessions()` 사용.\n    We might want to check if there are any places where `invalidateIndex()` is being used and suggest removing it.\n\n 2. The AGENTS.md also mentions R08: API key client exposure forbidden. We should ensure that API keys are only used in server-side routes.\n\n 3. We saw that there are many backup files for the agent/run route. Perhaps we can suggest cleaning up old backups or implementing a backup retention policy.\n\n 4. The project uses Next.js 14. We might suggest looking into the app directory structure for potential improvements.\n\n 5. We saw a skill for hermes-agent. Perhaps we can suggest improving the agent's capabilities.\n\n However, we are to suggest 3 things to implement next.\n\n Let's first look at the app directory to see what routes exist.\n\n We'll do a search for route.js files in the app directory.\n\n",
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-9ba882b3c0df7f66",
+          "call_id": "chatcmpl-tool-9ba882b3c0df7f66",
+          "response_item_id": "fc_chatcmpl-tool-9ba882b3c0df7f66",
+          "type": "function",
+          "function": {
+            "name": "search_files",
+            "arguments": "{\"limit\": 20, \"path\": \"app\", \"pattern\": \"route.js\", \"target\": \"files\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "name": "search_files",
+      "content": "{\"total_count\": 20, \"files\": [\"app/api/auth/route.js\", \"app/api/auth/login/route.js\", \"app/api/agent/run/route.js\", \"app/api/agent/gitnexus/route.js\", \"app/api/agent/reindex/route.js\", \"app/api/agent/approve/route.js\", \"app/api/agent/build-check/route.js\", \"app/api/agent/dashboard/route.js\", \"app/api/agent/debate/route.js\", \"app/api/agent/history/route.js\", \"app/api/agent/memory/route.js\", \"app/api/agent/plan/route.js\", \"app/api/agent/replan/route.js\", \"app/api/agent/rollback/route.js\", \"app/api/agent/session/route.js\", \"app/api/agent/slash/route.js\", \"app/api/agent/snapshots/route.js\", \"app/api/agent/subagent/route.js\", \"app/api/agent/v2/route.js\", \"app/api/graph/route.js\"], \"truncated\": true}\n\n[Hint: Results truncated. Use offset=20 to see more, or narrow with a more specific pattern or file_glob.]",
+      "tool_call_id": "chatcmpl-tool-9ba882b3c0df7f66"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "We are in the project root. We have seen the app directory contains many API routes.\n\n Let's also look at the components directory to see what UI components exist.\n\n We'll search for components directory and list some files.\n\n However, we are to suggest 3 things to implement next.\n\n Based on the project context (AGENTS.md) and the files we've seen, we can infer:\n\n - This is a Next.js app with a chat interface and an agent system.\n - The agent system uses OpenClaude CLI bridge (as per AGENTS.md).\n - There are various agent routes (run, backup, memory, gitnexus, etc.)\n\n Let's look at the AGENTS.md again for any specific rules or suggestions.\n\n We have already read AGENTS.md earlier in the context.\n\n From AGENTS.md:\n\n   - The project is Multi AI Chat, environment: Windows 11 / Node.js 24 / Next.js 14 / port 3100.\n   - Safety rules: no NEXT_PUBLIC_ API keys, no destructive commands without explicit request.\n   - Work rules: verify files before editing, verify filenames, minimal changes, report failures.\n\n   - Core rules (R01-R15) include: backup before file edit, runtime=nodejs in app/api/ routes, import at top, no client-side API key exposure, try-catch on fetch, Korean language, etc.\n\n   - Architecture: chat -> /api/chat -> direct LLM API; agent -> /api/agent/run -> OpenClaude CLI bridge; backup -> /api/agent/backup -> ZIP backups.\n\n   - Provider environment variable mapping.\n\n   - Directory structure.\n\n We also saw a CLAUDE.md (from the search) that describes multiple projects, but note that the current directory is /mnt/f/test/mama-v1.2, which seems to be the Mama AI project.\n\n Let's look at the package.json to understand dependencies and scripts.\n\n We'll read the package.json file.\n\n",
+      "finish_reason": "tool_calls",
+      "reasoning_content": "We are in the project root. We have seen the app directory contains many API routes.\n\n Let's also look at the components directory to see what UI components exist.\n\n We'll search for components directory and list some files.\n\n However, we are to suggest 3 things to implement next.\n\n Based on the project context (AGENTS.md) and the files we've seen, we can infer:\n\n - This is a Next.js app with a chat interface and an agent system.\n - The agent system uses OpenClaude CLI bridge (as per AGENTS.md).\n - There are various agent routes (run, backup, memory, gitnexus, etc.)\n\n Let's look at the AGENTS.md again for any specific rules or suggestions.\n\n We have already read AGENTS.md earlier in the context.\n\n From AGENTS.md:\n\n   - The project is Multi AI Chat, environment: Windows 11 / Node.js 24 / Next.js 14 / port 3100.\n   - Safety rules: no NEXT_PUBLIC_ API keys, no destructive commands without explicit request.\n   - Work rules: verify files before editing, verify filenames, minimal changes, report failures.\n\n   - Core rules (R01-R15) include: backup before file edit, runtime=nodejs in app/api/ routes, import at top, no client-side API key exposure, try-catch on fetch, Korean language, etc.\n\n   - Architecture: chat -> /api/chat -> direct LLM API; agent -> /api/agent/run -> OpenClaude CLI bridge; backup -> /api/agent/backup -> ZIP backups.\n\n   - Provider environment variable mapping.\n\n   - Directory structure.\n\n We also saw a CLAUDE.md (from the search) that describes multiple projects, but note that the current directory is /mnt/f/test/mama-v1.2, which seems to be the Mama AI project.\n\n Let's look at the package.json to understand dependencies and scripts.\n\n We'll read the package.json file.\n\n",
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-88307bb0ee38e6ea",
+          "call_id": "chatcmpl-tool-88307bb0ee38e6ea",
+          "response_item_id": "fc_chatcmpl-tool-88307bb0ee38e6ea",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\": \"package.json\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "name": "read_file",
+      "content": "{\"content\": \"     1|{\\n     2|  \\\"name\\\": \\\"multi-ai-chat\\\",\\n     3|  \\\"version\\\": \\\"0.1.0\\\",\\n     4|  \\\"private\\\": true,\\n     5|  \\\"scripts\\\": {\\n     6|    \\\"dev\\\": \\\"set NEXT_DIST_DIR=.next-dev&& start http://localhost:3100 & next dev -p 3100\\\",\\n     7|    \\\"build\\\": \\\"set NEXT_DIST_DIR=.next-prod&& next build\\\",\\n     8|    \\\"start\\\": \\\"set NEXT_DIST_DIR=.next-prod&& next start -p 3100\\\",\\n     9|    \\\"fresh\\\": \\\"node -e \\\\\\\"const fs=require('fs'); ['.next','.next-dev','.next-prod'].forEach(d=>fs.rmSync(d,{recursive:true,force:true}))\\\\\\\" && set NEXT_DIST_DIR=.next-dev&& next dev -p 3100\\\",\\n    10|    \\\"shadow:build\\\": \\\"cd .shadow && npx next build\\\",\\n    11|    \\\"shadow:diff\\\": \\\"git -C .shadow diff --name-only\\\",\\n    12|    \\\"shadow:merge\\\": \\\"git merge agent/shadow --no-ff -m \\\\\\\"agent: shadow merge\\\\\\\"\\\",\\n    13|    \\\"shadow:reset\\\": \\\"git -C .shadow checkout -- .\\\",\\n    14|    \\\"shadow:status\\\": \\\"if exist .shadow (echo .shadow exists) else (echo .shadow missing)\\\",\\n    15|    \\\"mcp\\\": \\\"node lib/mcp/server.js\\\",\\n    16|    \\\"gitnexus:mcp\\\": \\\"node scripts/gitnexus-local.mjs mcp\\\",\\n    17|    \\\"gitnexus:analyze\\\": \\\"node scripts/gitnexus-local.mjs analyze --skip-git --skills --worker-timeout 60 .\\\",\\n    18|    \\\"gitnexus:register\\\": \\\"node scripts/gitnexus-local.mjs index --allow-non-git .\\\",\\n    19|    \\\"gitnexus:bootstrap\\\": \\\"node scripts/gitnexus-local.mjs analyze --skip-git --skills --worker-timeout 60 . && node scripts/gitnexus-local.mjs index --allow-non-git .\\\",\\n    20|    \\\"gitnexus:status\\\": \\\"node scripts/gitnexus-local.mjs status\\\",\\n    21|    \\\"gitnexus:list\\\": \\\"node scripts/gitnexus-local.mjs list\\\",\\n    22|    \\\"gitnexus:query\\\": \\\"node scripts/gitnexus-local.mjs query\\\",\\n    23|    \\\"gitnexus:impact\\\": \\\"node scripts/gitnexus-local.mjs impact\\\",\\n    24|    \\\"gitnexus:context\\\": \\\"node scripts/gitnexus-local.mjs context\\\",\\n    25|    \\\"test:shadow\\\": \\\"node scripts/_test_shadow.mjs\\\",\\n    26|    \\\"test:e2e\\\": \\\"node scripts/_test_e2e_v4.mjs\\\",\\n    27|    \\\"test\\\": \\\"node scripts/_test_shadow.mjs && node scripts/_test_e2e_v4.mjs\\\",\\n    28|    \\\"test:task\\\": \\\"node scripts/_test_task_normalizer.mjs\\\",\\n    29|    \\\"test:failure\\\": \\\"node scripts/_test_failure_classifier.mjs\\\",\\n    30|    \\\"test:scenarios\\\": \\\"node scripts/_test_e2e_scenarios.mjs\\\",\\n    31|    \\\"precommit\\\": \\\"node scripts/gitnexus-local.mjs analyze --skip-git --skip-embeddings --worker-timeout 30 .\\\",\\n    32|    \\\"gitnexus:clean\\\": \\\"node scripts/gitnexus-local.mjs clean\\\",\\n    33|    \\\"gitnexus:wiki\\\": \\\"node scripts/gitnexus-local.mjs wiki --skip-git .\\\",\\n    34|    \\\"gitnexus:rename\\\": \\\"node scripts/gitnexus-local.mjs rename\\\",\\n    35|    \\\"gitnexus:reindex\\\": \\\"node scripts/gitnexus-local.mjs analyze --skip-git --force --skills --worker-timeout 60 .\\\",\\n    36|    \\\"gitnexus:detect\\\": \\\"node scripts/gitnexus-local.mjs detect_changes\\\",\\n    37|    \\\"predev\\\": \\\"node scripts/ensure-deps.mjs\\\",\\n    38|    \\\"prestart\\\": \\\"node scripts/ensure-deps.mjs\\\",\\n    39|    \\\"prebuild\\\": \\\"node scripts/ensure-deps.mjs\\\",\\n    40|    \\\"pack:portable\\\": \\\"powershell -ExecutionPolicy Bypass -File scripts/pack-portable.ps1\\\",\\n    41|    \\\"ensure-deps\\\": \\\"node scripts/ensure-deps.mjs\\\"\\n    42|  },\\n    43|  \\\"dependencies\\\": {\\n    44|    \\\"@gitlawb/openclaude\\\": \\\"^0.9.2\\\",\\n    45|    \\\"@google/generative-ai\\\": \\\"^0.14.1\\\",\\n    46|    \\\"@ohah/hwpjs\\\": \\\"^0.1.0-rc.10\\\",\\n    47|    \\\"@tavily/core\\\": \\\"^0.7.2\\\",\\n    48|    \\\"fuse.js\\\": \\\"^7.3.0\\\",\\n    49|    \\\"next\\\": \\\"14.2.3\\\",\\n    50|    \\\"node-cron\\\": \\\"^4.2.1\\\",\\n    51|    \\\"openai\\\": \\\"^4.104.0\\\",\\n    52|    \\\"pdf-parse\\\": \\\"^2.4.5\\\",\\n    53|    \\\"playwright\\\": \\\"^1.59.1\\\",\\n    54|    \\\"react\\\": \\\"^18.3.1\\\",\\n    55|    \\\"react-dom\\\": \\\"^18.3.1\\\",\\n    56|    \\\"react-markdown\\\": \\\"^10.1.0\\\",\\n    57|    \\\"remark-gfm\\\": \\\"^4.0.1\\\",\\n    58|    \\\"simple-git\\\": \\\"^3.25.0\\\",\\n    59|    \\\"xlsx\\\": \\\"^0.18.5\\\"\\n    60|  },\\n    61|  \\\"devDependencies\\\": {\\n    62|    \\\"@anthropic-ai/claude-code\\\": \\\"^2.1.138\\\",\\n    63|    \\\"@openai/codex\\\": \\\"^0.130.0\\\",\\n    64|    \\\"@playwright/test\\\": \\\"^1.59.1\\\",\\n    65|    \\\"acorn\\\": \\\"^8.16.0\\\",\\n    66|    \\\"acorn-jsx\\\": \\\"^5.3.2\\\",\\n    67|    \\\"autoprefixer\\\": \\\"^10.4.19\\\",\\n    68|    \\\"concurrently\\\": \\\"^9.2.1\\\",\\n    69|    \\\"postcss\\\": \\\"^8.4.38\\\",\\n    70|    \\\"tailwindcss\\\": \\\"^3.4.1\\\"\\n    71|  }\\n    72|}\\n    73|\", \"total_lines\": 72, \"file_size\": 3552, \"truncated\": false, \"is_binary\": false, \"is_image\": false}",
+      "tool_call_id": "chatcmpl-tool-88307bb0ee38e6ea"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "reasoning": "We are in the project root: /mnt/f/test/mama-v1.2\n\n We have seen:\n   - package.json shows it's a Next.js app with various dependencies.\n   - There are many API routes under app/api/ (auth, agent, etc.)\n   - There is a .next-dev directory (build artifacts)\n   - There is a .hermes-workspace directory (seems to be for the Hermes agent itself)\n\n The user wants: analyze the current working directory and suggest 3 things to implement next (without modifying files).\n\n Let's look at the structure a bit more to understand what might be missing or could be improved.\n\n We can look at the app directory to see the pages or the structure.\n\n However, note that the user said: \"파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\"\n\n We are only to suggest.\n\n Let's look at the app directory to see if there are any pages or components.\n\n We'll do:\n",
+      "finish_reason": "tool_calls",
+      "reasoning_content": "We are in the project root: /mnt/f/test/mama-v1.2\n\n We have seen:\n   - package.json shows it's a Next.js app with various dependencies.\n   - There are many API routes under app/api/ (auth, agent, etc.)\n   - There is a .next-dev directory (build artifacts)\n   - There is a .hermes-workspace directory (seems to be for the Hermes agent itself)\n\n The user wants: analyze the current working directory and suggest 3 things to implement next (without modifying files).\n\n Let's look at the structure a bit more to understand what might be missing or could be improved.\n\n We can look at the app directory to see the pages or the structure.\n\n However, note that the user said: \"파일 수정, 삭제, 설치, 실행 명령 수행은 하지 마.\"\n\n We are only to suggest.\n\n Let's look at the app directory to see if there are any pages or components.\n\n We'll do:\n",
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-b29f6cf1507836c7",
+          "call_id": "chatcmpl-tool-b29f6cf1507836c7",
+          "response_item_id": "fc_chatcmpl-tool-b29f6cf1507836c7",
+          "type": "function",
+          "function": {
+            "name": "search_files",
+            "arguments": "{\"limit\": 20, \"path\": \"app\", \"pattern\": \"*\", \"target\": \"files\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "name": "search_files",
+      "content": "{\"total_count\": 20, \"files\": [\"app/api/auth/route.js\", \"app/api/auth/route.js.before_login_v2_20260510-192312.bak\", \"app/api/auth/login/route.js\", \"app/api/auth/route.js.before_login_20260510-191712.bak\", \"app/api/agent/run/route.js\", \"app/api/agent/run/route.js.before_retry_rollback_20260511-065817.bak\", \"app/api/agent/run/route.js.before_codex_isolation_20260511-072101.bak\", \"app/api/agent/run/route.js.before_resolveauth_20260510-134332.bak\", \"app/api/agent/run/route.js.bak_429fix\", \"app/api/agent/run/route.js.bak_20260507_200643\", \"app/api/agent/run/route.js.bak_credfix_20260507_151506\", \"app/api/agent/run/route.js.bak_bare_20260507_151231\", \"app/api/agent/run/route.js.bak_anthfix_20260507_150943\", \"app/api/agent/run/route.js.bak_rmflag_20260507_150548\", \"app/api/agent/run/route.js.bak_tdzfix_20260507_150358\", \"app/api/agent/run/route.js.bak2_20260506_105711\", \"app/api/agent/run/route.js.bak_20260506_073146\", \"app/api/agent/run/route.js.before_progress\", \"app/api/agent/run/route.js.before_chat_history\", \"app/api/agent/backup/route.js\"], \"truncated\": true}\n\n[Hint: Results truncated. Use offset=20 to see more, or narrow with a more specific pattern or file_glob.]\n\n[Tool loop warning: idempotent_no_progress_warning; count=2; search_files returned the same result 2 times. Use the result already provided or change the query instead of repeating it unchanged.]",
+      "tool_call_id": "chatcmpl-tool-b29f6cf1507836c7"
+    },
+    {
+      "role": "assistant",
+      "content": "We have analyzed the project structure. Now we need to suggest 3 things to implement next without modifying any files.\n\nBased on the project context (AGENTS.md) and the files we've seen, we can make some educated suggestions.\n\nObservations:\n1. The project is a multi-AI chat application with agent capabilities.\n2. There are many backup files for route.js, indicating active development and potential instability.\n3. The project uses Next.js 14, React 18, and has a variety of AI provider integrations.\n4. There is a strong emphasis on security rules (e.g., no client-side API keys, proper error handling).\n5. The agent system uses OpenClaude CLI bridge via `/app/api/agent/run/route.js`.\n\nPotential areas for improvement or next steps:\n\n1. **Error Handling and Logging**: Given the numerous backup files and the emphasis on error handling in AGENTS.md (R09: 모든 fetch에 try-catch 필수. 에러는 한국어로 표시), we might suggest improving error handling and logging in the API routes.\n\n2. **Code Deduplication and Refactoring**: There are many similar route files (e.g., agent/*/route.js). We could suggest creating a base agent route handler to reduce duplication.\n\n3. **Testing and CI/CD**: The project has test scripts but we might suggest expanding test coverage, especially for the agent routes and backup functionality.\n\n4. **Documentation and Onboarding**: Improving README or contributing guidelines to help new developers.\n\n5. **Performance Optimization**: Given the use of Next.js, we might suggest optimizing bundles or implementing better caching.\n\n6. **Feature Enhancement**: Adding new AI providers or enhancing the agent capabilities (e.g., more tools, better memory management).\n\nHowever, note that we are only to suggest 3 things and not modify any files.\n\nLet's formulate three suggestions:\n\n1. **Implement Centralized Error Handling for API Routes**: Create a higher-order function or middleware that wraps all API routes to ensure consistent error handling, logging, and response formatting in Korean as per R09.\n\n2. **Refactor Agent Route Handlers**: Extract common logic from the various agent route files (e.g., run, memory, backup) into a shared service layer to reduce code duplication and improve maintainability.\n\n3. **Add Comprehensive Integration Tests**: Develop a test suite that simulates user interactions with the chat and agent systems, covering key flows like starting a chat, invoking an agent, and handling errors",
+      "reasoning": "We have analyzed the project structure. Now we need to suggest 3 things to implement next without modifying any files.\n\nBased on the project context (AGENTS.md) and the files we've seen, we can make some educated suggestions.\n\nObservations:\n1. The project is a multi-AI chat application with agent capabilities.\n2. There are many backup files for route.js, indicating active development and potential instability.\n3. The project uses Next.js 14, React 18, and has a variety of AI provider integrations.\n4. There is a strong emphasis on security rules (e.g., no client-side API keys, proper error handling).\n5. The agent system uses OpenClaude CLI bridge via `/app/api/agent/run/route.js`.\n\nPotential areas for improvement or next steps:\n\n1. **Error Handling and Logging**: Given the numerous backup files and the emphasis on error handling in AGENTS.md (R09: 모든 fetch에 try-catch 필수. 에러는 한국어로 표시), we might suggest improving error handling and logging in the API routes.\n\n2. **Code Deduplication and Refactoring**: There are many similar route files (e.g., agent/*/route.js). We could suggest creating a base agent route handler to reduce duplication.\n\n3. **Testing and CI/CD**: The project has test scripts but we might suggest expanding test coverage, especially for the agent routes and backup functionality.\n\n4. **Documentation and Onboarding**: Improving README or contributing guidelines to help new developers.\n\n5. **Performance Optimization**: Given the use of Next.js, we might suggest optimizing bundles or implementing better caching.\n\n6. **Feature Enhancement**: Adding new AI providers or enhancing the agent capabilities (e.g., more tools, better memory management).\n\nHowever, note that we are only to suggest 3 things and not modify any files.\n\nLet's formulate three suggestions:\n\n1. **Implement Centralized Error Handling for API Routes**: Create a higher-order function or middleware that wraps all API routes to ensure consistent error handling, logging, and response formatting in Korean as per R09.\n\n2. **Refactor Agent Route Handlers**: Extract common logic from the various agent route files (e.g., run, memory, backup) into a shared service layer to reduce code duplication and improve maintainability.\n\n3. **Add Comprehensive Integration Tests**: Develop a test suite that simulates user interactions with the chat and agent systems, covering key flows like starting a chat, invoking an agent, and handling errors",
+      "finish_reason": "length",
+      "reasoning_content": "We have analyzed the project structure. Now we need to suggest 3 things to implement next without modifying any files.\n\nBased on the project context (AGENTS.md) and the files we've seen, we can make some educated suggestions.\n\nObservations:\n1. The project is a multi-AI chat application with agent capabilities.\n2. There are many backup files for route.js, indicating active development and potential instability.\n3. The project uses Next.js 14, React 18, and has a variety of AI provider integrations.\n4. There is a strong emphasis on security rules (e.g., no client-side API keys, proper error handling).\n5. The agent system uses OpenClaude CLI bridge via `/app/api/agent/run/route.js`.\n\nPotential areas for improvement or next steps:\n\n1. **Error Handling and Logging**: Given the numerous backup files and the emphasis on error handling in AGENTS.md (R09: 모든 fetch에 try-catch 필수. 에러는 한국어로 표시), we might suggest improving error handling and logging in the API routes.\n\n2. **Code Deduplication and Refactoring**: There are many similar route files (e.g., agent/*/route.js). We could suggest creating a base agent route handler to reduce duplication.\n\n3. **Testing and CI/CD**: The project has test scripts but we might suggest expanding test coverage, especially for the agent routes and backup functionality.\n\n4. **Documentation and Onboarding**: Improving README or contributing guidelines to help new developers.\n\n5. **Performance Optimization**: Given the use of Next.js, we might suggest optimizing bundles or implementing better caching.\n\n6. **Feature Enhancement**: Adding new AI providers or enhancing the agent capabilities (e.g., more tools, better memory management).\n\nHowever, note that we are only to suggest 3 things and not modify any files.\n\nLet's formulate three suggestions:\n\n1. **Implement Centralized Error Handling for API Routes**: Create a higher-order function or middleware that wraps all API routes to ensure consistent error handling, logging, and response formatting in Korean as per R09.\n\n2. **Refactor Agent Route Handlers**: Extract common logic from the various agent route files (e.g., run, memory, backup) into a shared service layer to reduce code duplication and improve maintainability.\n\n3. **Add Comprehensive Integration Tests**: Develop a test suite that simulates user interactions with the chat and agent systems, covering key flows like starting a chat, invoking an agent, and handling errors"
+    },
+    {
+      "role": "user",
+      "content": "[System: Your previous response was truncated by the output length limit. Continue exactly where you left off. Do not restart or repeat prior text. Finish the answer directly.]"
+    },
+    {
+      "role": "assistant",
+      "content": "1. 중앙집중식 에러 처리 미들웨어 구현: 모든 API 라우트에 일관된 try-catch 로깅 및 한국어 에러 응답을 제공하는 미들웨어를 추가하여 R09 및 R14 규칙을 자동으로 준수하게 합니다.これにより、개별 라우트에서의 실수를 방지하고 에러 로그 표준화를 달성할 수 있습니다.\n\n2. 에이전트 서비스 레이어 리팩터링: 현재 중복된 로직이 많은 에이전트 라우트 파일들(run, memory, backup 등)을 분석하여 공통 기능을 서비스 레이어로 추출합니다. 이렇게 하면 백업 파일이 자주 생성되는 문제를 줄이고 향후 유지보수성을 높일 수 있습니다.\n\n3. 핵심 사용자 흐름을 대상으로 한 통합 테스트 세트 확장: 채팅 시작, 다양한 프로바이더로 에이전트 호출, 백업/복원 작업 등을 시나리오로 하는 통합 테스트를 작성합니다. 기존 테스트 스크립트를 기반으로 하여 주요 기능의 회귀를 방지하고 안정성을 향상시킬 수 있습니다.",
+      "reasoning": "We are to suggest 3 things to implement next without modifying any files.\n We have already provided three suggestions in the previous response, but the system says the response was truncated.\n Let's continue from where we left off and finish the answer directly.\n\n However, note that the previous response was cut off. We need to output the rest of the answer.\n\n Since we are not allowed to modify files, we will just state the three suggestions.\n\n Let's assume the previous response had started listing the suggestions and then got cut off.\n\n We'll now output the three suggestions in a clear manner.\n\n But note: the user's request was to analyze the current working directory and suggest only 3 things to implement next.\n\n We have already analyzed the directory and can now provide the three suggestions.\n\n Let's write them out:\n\n 1. Implement centralized error handling for API routes to ensure consistent error responses and logging in Korean.\n 2. Refactor agent route handlers to reduce duplication by creating a shared service layer.\n 3. Add comprehensive integration tests for key user flows (chat, agent invocation, backup/restore).\n\n However, to be more specific based on the project:\n\n Looking at the AGENTS.md, we see:\n   - R09: 모든 fetch에 try-catch 필수. 에러는 한국어로 표시\n   - R12: `invalidateIndex()` 호출 금지. `saveSession()` / `searchSessions()` 사용\n   - R14: 한국어 질문→한국어 답변\n\n So, the first suggestion about error handling in Korean is directly from the rules.\n\n Second, we see many backup files for agent routes, suggesting that the agent routes are frequently changing and might benefit from refactoring.\n\n Third, the project has test scripts but we might want to expand on them.\n\n Let's phrase the three suggestions as:\n\n 1. **Centralized Error Handling Middleware**: Implement a middleware for Next.js API routes that automatically wraps route handlers in try-catch, logs errors, and returns error responses in Korean, ensuring compliance with R09 and R14.\n\n 2. **Agent Service Layer Refactor**: Extract common functionality from the agent route files (e.g., run, memory, backup) into a service layer to reduce code duplication and minimize the risk of inconsistencies, especially given the numerous backup files indicating frequent changes.\n\n 3. **Enhanced Integration Test Suite**: Develop a set of integration tests using the existing test scripts as a foundation to cover critical user journeys such as initiating a chat, invoking an agent with various providers, and verifying backup and restore operations, thereby improving reliability and preventing regressions.\n\n Now, we output these three suggestions.\n\n Since the previous response was truncated, we will just output the three suggestions without any extra text.\n\n However, note that the system said: \"Continue exactly where you left off.\"\n\n We don't know exactly where we left off, but we can assume we were in the middle of listing the suggestions.\n\n Let's output the three suggestions in a numbered list.\n\n But note: the user might be expecting a plain text response.\n\n We'll write:\n\n 1. Implement centralized error handling for API routes to ensure consistent error responses and logging in Korean.\n 2. Refactor agent route handlers to reduce duplication by creating a shared service layer.\n 3. Add comprehensive integration tests for key user flows (chat, agent invocation, backup/restore).\n\n However, to be safe, let's output exactly that.\n\n",
+      "finish_reason": "stop",
+      "reasoning_content": "We are to suggest 3 things to implement next without modifying any files.\n We have already provided three suggestions in the previous response, but the system says the response was truncated.\n Let's continue from where we left off and finish the answer directly.\n\n However, note that the previous response was cut off. We need to output the rest of the answer.\n\n Since we are not allowed to modify files, we will just state the three suggestions.\n\n Let's assume the previous response had started listing the suggestions and then got cut off.\n\n We'll now output the three suggestions in a clear manner.\n\n But note: the user's request was to analyze the current working directory and suggest only 3 things to implement next.\n\n We have already analyzed the directory and can now provide the three suggestions.\n\n Let's write them out:\n\n 1. Implement centralized error handling for API routes to ensure consistent error responses and logging in Korean.\n 2. Refactor agent route handlers to reduce duplication by creating a shared service layer.\n 3. Add comprehensive integration tests for key user flows (chat, agent invocation, backup/restore).\n\n However, to be more specific based on the project:\n\n Looking at the AGENTS.md, we see:\n   - R09: 모든 fetch에 try-catch 필수. 에러는 한국어로 표시\n   - R12: `invalidateIndex()` 호출 금지. `saveSession()` / `searchSessions()` 사용\n   - R14: 한국어 질문→한국어 답변\n\n So, the first suggestion about error handling in Korean is directly from the rules.\n\n Second, we see many backup files for agent routes, suggesting that the agent routes are frequently changing and might benefit from refactoring.\n\n Third, the project has test scripts but we might want to expand on them.\n\n Let's phrase the three suggestions as:\n\n 1. **Centralized Error Handling Middleware**: Implement a middleware for Next.js API routes that automatically wraps route handlers in try-catch, logs errors, and returns error responses in Korean, ensuring compliance with R09 and R14.\n\n 2. **Agent Service Layer Refactor**: Extract common functionality from the agent route files (e.g., run, memory, backup) into a service layer to reduce code duplication and minimize the risk of inconsistencies, especially given the numerous backup files indicating frequent changes.\n\n 3. **Enhanced Integration Test Suite**: Develop a set of integration tests using the existing test scripts as a foundation to cover critical user journeys such as initiating a chat, invoking an agent with various providers, and verifying backup and restore operations, thereby improving reliability and preventing regressions.\n\n Now, we output these three suggestions.\n\n Since the previous response was truncated, we will just output the three suggestions without any extra text.\n\n However, note that the system said: \"Continue exactly where you left off.\"\n\n We don't know exactly where we left off, but we can assume we were in the middle of listing the suggestions.\n\n Let's output the three suggestions in a numbered list.\n\n But note: the user might be expecting a plain text response.\n\n We'll write:\n\n 1. Implement centralized error handling for API routes to ensure consistent error responses and logging in Korean.\n 2. Refactor agent route handlers to reduce duplication by creating a shared service layer.\n 3. Add comprehensive integration tests for key user flows (chat, agent invocation, backup/restore).\n\n However, to be safe, let's output exactly that.\n\n"
+    }
+  ]
+}

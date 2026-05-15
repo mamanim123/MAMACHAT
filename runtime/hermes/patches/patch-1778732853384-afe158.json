@@ -1,0 +1,47 @@
+{
+  "patchId": "patch-1778732853384-afe158",
+  "version": 1,
+  "status": "rolledback",
+  "title": "Patch system smoke test",
+  "description": "Create a temporary file through patch approval flow.",
+  "workspaceRoot": "F:\\mamabot",
+  "createdAt": "2026-05-14T04:27:33.384Z",
+  "updatedAt": "2026-05-14T04:30:33.455Z",
+  "changes": [
+    {
+      "path": "runtime/temp/patch-smoke-test.txt",
+      "mode": "create",
+      "beforeExists": false,
+      "beforeHash": "e3b0c44298fc1c14",
+      "afterHash": "43b55b1f383c1dc1",
+      "beforeSize": 0,
+      "afterSize": 55,
+      "content": "Mamabot patch approval smoke test\ncreatedAt=2026-05-14\n",
+      "preview": "--- runtime/temp/patch-smoke-test.txt (new file)\n+++ runtime/temp/patch-smoke-test.txt (after)\n@@ preview @@\nbeforeLines=0\nafterLines=3\n\n[before]\n\n\n[after]\nMamabot patch approval smoke test\ncreatedAt=2026-05-14\n"
+    }
+  ],
+  "backups": [
+    {
+      "path": "runtime/temp/patch-smoke-test.txt",
+      "beforeExists": false,
+      "backupPath": "",
+      "targetPath": "F:\\mamabot\\runtime\\temp\\patch-smoke-test.txt"
+    }
+  ],
+  "applyLog": [
+    {
+      "path": "runtime/temp/patch-smoke-test.txt",
+      "applied": true,
+      "at": "2026-05-14T04:29:41.196Z"
+    }
+  ],
+  "rollbackLog": [
+    {
+      "path": "runtime/temp/patch-smoke-test.txt",
+      "rolledBack": true,
+      "at": "2026-05-14T04:30:33.455Z"
+    }
+  ],
+  "appliedAt": "2026-05-14T04:29:41.196Z",
+  "rolledBackAt": "2026-05-14T04:30:33.455Z"
+}

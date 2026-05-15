@@ -1,0 +1,9 @@
+{
+  "prompt": "이 프로젝트의 Agent 실행 흐름을 간단히 분석하고 다음 작업 3가지만 제안해줘. 파일은 수정하지 마.",
+  "provider": "openrouter",
+  "model": "nvidia/nemotron-3-super-120b-a12b:free",
+  "mode": "suggest",
+  "dryRun": true,
+  "workspaceRoot": "F:\\mamabot",
+  "skills": "hermes-agent,writing-plans"
+}

@@ -1,0 +1,54 @@
+﻿# Node / Next
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Backups / exports
+backup/
+backups/
+mamabot_exports/
+_exports/
+
+# Local references
+참고자료/
+
+# Runtime generated files
+runtime/workspace-index/
+runtime/logs/
+runtime/hermes/logs/
+runtime/hermes/runs/
+runtime/hermes/sessions/
+
+# Hermes local secrets / machine state
+runtime/hermes/home/auth.json
+runtime/hermes/home/.hermes/auth.json
+runtime/hermes/home/.hermes/.env
+runtime/hermes/home/.hermes/logs/
+runtime/hermes/home/.hermes/sessions/
+runtime/hermes/home/hermes-agent/venv/
+runtime/hermes/home/hermes-agent/.git/
+
+# Cache
+config/cache/
+
+# Secrets
+secrets/.env.local
+.env
+.env.local
+
+# Logs / temp
+*.log
+*.tmp
+*.bak
+*.backup
+*.pid
+*.old
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

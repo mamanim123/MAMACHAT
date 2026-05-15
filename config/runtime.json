@@ -1,0 +1,14 @@
+{
+"node": {
+"mode": "system",
+"portablePath": "runtime/bin/node"
+},
+"git": {
+"mode": "system",
+"portablePath": "runtime/bin/git"
+},
+"cli": {
+"root": "runtime/cli",
+"autoInstall": true
+}
+}

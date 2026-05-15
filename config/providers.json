@@ -1,0 +1,78 @@
+{
+  "mainRuntime": {
+    "id": "hermes",
+    "name": "Hermes Agent",
+    "type": "self_improving_agent",
+    "installMode": "wsl_or_docker",
+    "enabled": true
+  },
+  "assistantCliProviders": [
+    {
+      "id": "codex",
+      "name": "Codex",
+      "type": "auth_cli",
+      "role": "coding_assistant",
+      "enabled": false
+    },
+    {
+      "id": "claude_code",
+      "name": "Claude Code",
+      "type": "auth_cli",
+      "role": "coding_assistant",
+      "enabled": false
+    },
+    {
+      "id": "openclaude",
+      "name": "OpenClaude",
+      "type": "auth_cli",
+      "role": "optional_bridge",
+      "enabled": false
+    }
+  ],
+  "apiProviders": [
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "api_key",
+      "envKey": "OPENROUTER_API_KEY",
+      "enabled": true
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "type": "api_key",
+      "envKey": "OPENAI_API_KEY",
+      "enabled": true
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "type": "api_key",
+      "envKey": "ANTHROPIC_API_KEY",
+      "enabled": true
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "type": "api_key",
+      "envKey": "GEMINI_API_KEY",
+      "enabled": true
+    }
+  ],
+  "localProviders": [
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "type": "local",
+      "baseUrl": "http://localhost:11434",
+      "enabled": true
+    },
+    {
+      "id": "lmstudio",
+      "name": "LM Studio",
+      "type": "local",
+      "baseUrl": "http://localhost:1234/v1",
+      "enabled": true
+    }
+  ]
+}
