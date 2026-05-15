@@ -52,3 +52,5 @@ secrets/.env.local
 Thumbs.db
 .vscode/
 .idea/
+
+runtime/hermes/home/hermes-agent/
