@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "defaultAgentId": "hermes",
+  "uiPolicy": {
+    "primarySelectorLabel": "실행 대상",
+    "apiModelPickerVisibleOnlyForKinds": [
+      "api-model",
+      "hermes"
+    ],
+    "freeModelProviderVisibleOnlyForKinds": [
+      "api-model",
+      "hermes"
+    ],
+    "oauthPanelVisibleOnlyForKinds": [
+      "auth-cli"
+    ],
+    "localPanelVisibleOnlyForKinds": [
+      "local"
+    ]
+  },
+  "safetyPolicy": {
+    "neverMixSubscriptionCliWithApiKeys": true,
+    "scrubApiKeysForOAuthCli": true,
+    "keepCliRuntimeInsidePortableFolder": true,
+    "keepWorkspaceClean": true
+  },
+  "agents": [
+    {
+      "id": "hermes",
+      "label": "Hermes Agent",
+      "kind": "hermes",
+      "group": "Agent",
+      "badge": "AGENT",
+      "runtime": "wsl",
+      "executable": "hermes",
+      "authMode": "hermes-provider",
+      "credentialProfile": "runtime/hermes/home",
+      "modelSource": "hermes-native",
+      "allowApiModelPicker": true,
+      "allowFreeModels": true,
+      "workspaceMode": "selected-cwd",
+      "envPolicy": "hermes"
+    },
+    {
+      "id": "claude-code",
+      "label": "Claude Code",
+      "kind": "auth-cli",
+      "group": "OAuth 인증",
+      "badge": "OAUTH",
+      "runtime": "node-cli",
+      "executable": "claude",
+      "authMode": "subscription-oauth",
+      "credentialProfile": "runtime/claude-home",
+      "modelSource": "cli-native",
+      "allowApiModelPicker": false,
+      "allowFreeModels": false,
+      "workspaceMode": "selected-cwd",
+      "envPolicy": "claude-code-oauth"
+    },
+    {
+      "id": "codex-cli",
+      "label": "Codex CLI",
+      "kind": "auth-cli",
+      "group": "OAuth 인증",
+      "badge": "OAUTH",
+      "runtime": "node-cli",
+      "executable": "codex",
+      "authMode": "chatgpt-oauth",
+      "credentialProfile": "runtime/codex-home",
+      "modelSource": "cli-native",
+      "allowApiModelPicker": false,
+      "allowFreeModels": false,
+      "workspaceMode": "selected-cwd",
+      "envPolicy": "codex-chatgpt-oauth"
+    },
+    {
+      "id": "gemini-cli",
+      "label": "Gemini CLI",
+      "kind": "auth-cli",
+      "group": "OAuth 인증",
+      "badge": "OAUTH",
+      "runtime": "node-cli",
+      "executable": "gemini",
+      "authMode": "google-login",
+      "credentialProfile": "runtime/gemini-home",
+      "modelSource": "cli-native",
+      "allowApiModelPicker": false,
+      "allowFreeModels": false,
+      "workspaceMode": "selected-cwd",
+      "envPolicy": "gemini-google-login"
+    },
+    {
+      "id": "opencode",
+      "label": "OpenCode",
+      "kind": "auth-cli",
+      "group": "OAuth 인증",
+      "badge": "OAUTH",
+      "runtime": "node-cli",
+      "executable": "opencode",
+      "authMode": "agent-native",
+      "credentialProfile": "runtime/opencode-home",
+      "modelSource": "cli-native",
+      "allowApiModelPicker": false,
+      "allowFreeModels": false,
+      "workspaceMode": "selected-cwd",
+      "envPolicy": "opencode-native"
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter API",
+      "kind": "api-model",
+      "group": "무료/API 모델",
+      "badge": "FREE+API",
+      "runtime": "server-api",
+      "authMode": "api-key",
+      "credentialProfile": "secrets/.env.local",
+      "modelSource": "openrouter-live",
+      "allowApiModelPicker": true,
+      "allowFreeModels": true,
+      "workspaceMode": "server-mediated",
+      "envPolicy": "api-openrouter"
+    },
+    {
+      "id": "gemini-api",
+      "label": "Gemini API",
+      "kind": "api-model",
+      "group": "무료/API 모델",
+      "badge": "API",
+      "runtime": "server-api",
+      "authMode": "api-key",
+      "credentialProfile": "secrets/.env.local",
+      "modelSource": "gemini-api",
+      "allowApiModelPicker": true,
+      "allowFreeModels": true,
+      "workspaceMode": "server-mediated",
+      "envPolicy": "api-gemini"
+    },
+    {
+      "id": "openai-api",
+      "label": "OpenAI API",
+      "kind": "api-model",
+      "group": "API 모델",
+      "badge": "API",
+      "runtime": "server-api",
+      "authMode": "api-key",
+      "credentialProfile": "secrets/.env.local",
+      "modelSource": "openai-api",
+      "allowApiModelPicker": true,
+      "allowFreeModels": false,
+      "workspaceMode": "server-mediated",
+      "envPolicy": "api-openai"
+    },
+    {
+      "id": "anthropic-api",
+      "label": "Anthropic API",
+      "kind": "api-model",
+      "group": "API 모델",
+      "badge": "API",
+      "runtime": "server-api",
+      "authMode": "api-key",
+      "credentialProfile": "secrets/.env.local",
+      "modelSource": "anthropic-api",
+      "allowApiModelPicker": true,
+      "allowFreeModels": false,
+      "workspaceMode": "server-mediated",
+      "envPolicy": "api-anthropic"
+    },
+    {
+      "id": "ollama",
+      "label": "Ollama Local",
+      "kind": "local",
+      "group": "Local",
+      "badge": "LOCAL",
+      "runtime": "local-http",
+      "authMode": "none",
+      "credentialProfile": "local",
+      "modelSource": "ollama",
+      "endpoint": "http://localhost:11434",
+      "allowApiModelPicker": false,
+      "allowFreeModels": false,
+      "workspaceMode": "server-mediated",
+      "envPolicy": "local-ollama"
+    }
+  ],
+  "groups": [
+    {
+      "id": "oauth",
+      "label": "OAuth 인증",
+      "kinds": [
+        "auth-cli"
+      ]
+    },
+    {
+      "id": "free-api",
+      "label": "무료/API 모델",
+      "kinds": [
+        "api-model"
+      ]
+    },
+    {
+      "id": "agent",
+      "label": "Agent",
+      "kinds": [
+        "hermes"
+      ]
+    },
+    {
+      "id": "local",
+      "label": "Local",
+      "kinds": [
+        "local"
+      ]
+    }
+  ]
+}

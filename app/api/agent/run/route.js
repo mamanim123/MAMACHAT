@@ -34,6 +34,308 @@ function shellQuote(value) {
   return "'" + String(value).replace(/'/g, "'\\''") + "'";
 }
 
+function isAuthCliProvider(provider = "") {
+  return ["claude-code", "codex-cli", "gemini-cli", "opencode", "codex", "claude_code", "openclaude"].includes(
+    String(provider || "").trim()
+  );
+}
+
+function getAuthCliProviderLabel(provider = "") {
+  const id = String(provider || "").trim();
+
+  if (id === "claude-code" || id === "claude_code") return "Claude Code";
+  if (id === "codex-cli" || id === "codex") return "Codex CLI";
+  if (id === "gemini-cli") return "Gemini CLI";
+  if (id === "opencode" || id === "openclaude") return "OpenCode/OpenClaude";
+  return id || "Auth CLI Agent";
+}
+
+function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest" }) {
+  const providerId = String(provider || "").trim();
+  const selectedModel = String(model || "").trim();
+  const safePrompt = String(prompt || "").trim();
+
+  if (providerId === "claude-code" || providerId === "claude_code") {
+    const args = ["-p", safePrompt];
+
+    if (selectedModel) {
+      args.push("--model", selectedModel);
+    }
+
+    if (mode === "suggest") {
+      args.push("--permission-mode", "plan");
+    } else {
+      args.push("--permission-mode", "default");
+    }
+
+    return {
+      command: "claude",
+      args,
+      homeDirName: "claude-home",
+      scrubKeys: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_API_KEY", "OPENROUTER_API_KEY"],
+      extraEnv: {}
+    };
+  }
+
+  if (providerId === "codex-cli" || providerId === "codex") {
+    const args = ["exec"];
+
+    // Codex는 신뢰 디렉토리 체크를 반드시 우회해야 대시보드 workspace에서도 실행된다.
+    args.push("--skip-git-repo-check");
+
+    if (workspaceRoot) {
+      args.push("-C", workspaceRoot);
+    }
+
+    args.push("--sandbox", "read-only");
+
+    // codex-default는 모델명을 비워서 계정 자동 모델로 실행한다.
+    if (model && model !== "codex-default") {
+      args.push("-m", model);
+    }
+
+    args.push(prompt);
+
+    return {
+      command: "codex",
+      args,
+      homeDirName: "codex-home",
+      usePortableHome: false,
+      scrubKeys: ["OPENROUTER_API_KEY"]
+    };
+  }
+
+  if (providerId === "gemini-cli") {
+    const args = ["-p", safePrompt, "--skip-trust", "--output-format", "text"];
+
+    if (selectedModel) {
+      args.push("-m", selectedModel);
+    }
+
+    if (mode === "suggest") {
+      args.push("--approval-mode", "plan");
+    } else {
+      args.push("--approval-mode", "default");
+    }
+
+    return {
+      command: "gemini",
+      args,
+      homeDirName: "gemini-home",
+      scrubKeys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+      extraEnv: {}
+    };
+  }
+
+  return null;
+}
+
+function psArg(value = "") {
+  return "'" + String(value).replace(/'/g, "''") + "'";
+}
+
+function buildPowerShellCliInvocation(command = "", args = []) {
+  return "& " + psArg(command) + " " + args.map((arg) => psArg(arg)).join(" ");
+}
+
+
+function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = "", executionProfile = "" }) {
+  const raw = String(prompt || "").trim();
+  const style = String(responseMode || responseStyle || "").toLowerCase();
+  const profile = String(executionProfile || "").toLowerCase();
+
+  const isQuick =
+    style.includes("quick") ||
+    style.includes("short") ||
+    style.includes("짧") ||
+    profile === "quick";
+
+  if (!isQuick) return raw;
+
+  return [
+    "Answer briefly.",
+    "Do not explain unless necessary.",
+    "For greetings or simple checks, reply in one short sentence.",
+    "User request:",
+    raw
+  ].join("\n");
+}
+
+function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode }) {
+  return new Promise((resolve) => {
+    const root = process.cwd();
+    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode });
+
+    if (!spec) {
+      resolve({
+        ok: false,
+        stdout: "",
+        stderr: "Unsupported auth-cli provider: " + provider,
+        exitCode: 1,
+        command: "auth-cli"
+      });
+      return;
+    }
+
+    const runtimeHome = path.join(root, "runtime", spec.homeDirName);
+    fs.mkdirSync(runtimeHome, { recursive: true });
+
+    const env = { ...process.env };
+
+    // 인증형 CLI는 사용자가 이미 로그인한 공식 CLI credential store를 그대로 사용한다.
+    // HOME/USERPROFILE을 runtime 폴더로 바꾸면 Claude/Gemini/Codex 로그인이 풀리는 문제가 생긴다.
+    if (spec.usePortableHome === true) {
+      env.HOME = runtimeHome;
+      env.USERPROFILE = runtimeHome;
+    }
+
+    for (const key of spec.scrubKeys || []) {
+      delete env[key];
+    }
+
+    for (const [key, value] of Object.entries(spec.extraEnv || {})) {
+      env[key] = path.isAbsolute(value) ? value : path.join(root, value);
+    }
+
+    // [PORTABLE CLI] runtime/cli/node_modules/.bin을 PATH 맨 앞에 강제 주입
+    const portableBinDir = path.join(root, "runtime", "cli", "node_modules", ".bin");
+    if (fs.existsSync(portableBinDir)) {
+      const sep = process.platform === "win32" ? ";" : ":";
+      env.PATH = portableBinDir + sep + (env.PATH || env.Path || "");
+      if (process.platform === "win32") env.Path = env.PATH;
+    }
+
+    // [PORTABLE CLI] 절대경로로 CLI를 직접 잡는다 (전역 PATH 오염 무시)
+    let resolvedCommand = spec.command;
+    if (process.platform === "win32") {
+      const cmdCandidate = path.join(portableBinDir, spec.command + ".cmd");
+      if (fs.existsSync(cmdCandidate)) resolvedCommand = cmdCandidate;
+    } else {
+      const binCandidate = path.join(portableBinDir, spec.command);
+      if (fs.existsSync(binCandidate)) resolvedCommand = binCandidate;
+    }
+
+    logLine(runId, `START auth-cli provider=${provider} model=${model || "-"} command=${resolvedCommand}`);
+    logLine(runId, `auth-cli cwd=${workspaceRoot || root}`);
+
+    let spawnCommand = resolvedCommand;
+    let spawnArgs = spec.args;
+    let spawnUseShell = false;
+
+    if (process.platform === "win32") {
+      // Node v18+ .cmd 보안 패치 회피: shell:true로 호출하되 인자를 안전하게 quoting.
+      const SAFE_ARG = /^[A-Za-z0-9_.\/:=\\-]+$/;
+      const quoteArg = (a) => {
+        const s = String(a == null ? "" : a);
+        if (s === "") return '""';
+        const escaped = s.replace(/"/g, '\\"');
+        return SAFE_ARG.test(s) ? s : `"${escaped}"`;
+      };
+      const quotedCmd = SAFE_ARG.test(resolvedCommand) ? resolvedCommand : `"${resolvedCommand}"`;
+      spawnCommand = quotedCmd + " " + spec.args.map(quoteArg).join(" ");
+      spawnArgs = [];
+      spawnUseShell = true;
+    }
+
+    logLine(runId, `SPAWN ${process.platform === "win32" ? "[win32 shell]" : "[posix]"} ${spawnCommand}`);
+
+    const child = spawn(spawnCommand, spawnArgs, {
+      cwd: workspaceRoot || root,
+      env,
+      shell: spawnUseShell,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGTERM");
+      } catch {}
+      stderr += "\n[Mamabot] auth-cli timeout after 5 minutes.";
+    }, 5 * 60 * 1000);
+
+    child.stdout.on("data", (chunk) => {
+      const text = chunk.toString("utf8");
+      stdout += text;
+      for (const line of text.split(/\r?\n/)) {
+        if (line.trim()) logLine(runId, `[auth-cli stdout] ${line}`);
+      }
+    });
+
+    child.stderr.on("data", (chunk) => {
+      const text = chunk.toString("utf8");
+      stderr += text;
+      for (const line of text.split(/\r?\n/)) {
+        if (line.trim()) logLine(runId, `[auth-cli stderr] ${line}`);
+      }
+    });
+
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      resolve({
+        ok: false,
+        stdout,
+        stderr: stderr || error.message || String(error),
+        exitCode: 1,
+        command: spec.command
+      });
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      logLine(runId, `END auth-cli exitCode=${code}`);
+
+      resolve({
+        ok: code === 0,
+        stdout,
+        stderr,
+        exitCode: code,
+        command: spec.command + " " + spec.args.map((item) => String(item).includes(" ") ? "'" + String(item).slice(0, 60) + "'" : String(item)).join(" ")
+      });
+    });
+  });
+}
+
+
+function cleanAuthCliOutput(stdout = "", stderr = "") {
+  const outLines = String(stdout || "")
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    // Windows 작업 종료/프로세스 메시지, 깨진 문자 라인 제거
+    .filter((line) => !/PID\s+\d+/i.test(line))
+    .filter((line) => !line.includes("ï¿½"))
+    .filter((line) => !line.includes("�"));
+
+  if (outLines.length > 0) {
+    return outLines[outLines.length - 1];
+  }
+
+  const errLines = String(stderr || "")
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const codexIndex = errLines.lastIndexOf("codex");
+  if (codexIndex >= 0 && errLines[codexIndex + 1]) {
+    return errLines[codexIndex + 1];
+  }
+
+  return errLines.slice(-1)[0] || "";
+}
+
+function cleanAgentText(value = "") {
+  return String(value || "")
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+}
+
 function maskPrompt(prompt) {
   if (!prompt) return "";
   if (prompt.length <= 180) return prompt;
@@ -433,7 +735,144 @@ let workspaceWsl = "";
     allowHighTokenRisk = body.allowHighTokenRisk === true;
     sessionId = body.sessionId || "";
 
-    logLine(runId, `REQUEST dryRun=${dryRun}`);
+    // AUTH_CLI_WORKSPACE_EARLY_BIND
+    // auth-cli runner는 workspaceRoot 계산 전에 실행될 수 있으므로 body에서 먼저 묶는다.
+    if (!workspaceRoot) {
+      const earlyWorkspaceRoot =
+        body.workspaceRoot ||
+        body.workspace ||
+        body.cwd ||
+        body.projectRoot ||
+        body.workspacePath ||
+        "";
+
+      if (earlyWorkspaceRoot) {
+        workspaceRoot = String(earlyWorkspaceRoot);
+      }
+    }
+
+    // AUTH_CLI_RUNNER_V1
+    // Claude Code / Codex CLI / Gemini CLI는 OpenRouter가 아니라 각 공식 CLI로 실행한다.
+    if (isAuthCliProvider(provider)) {
+      if (!prompt.trim()) {
+        return NextResponse.json(
+          { ok: false, error: "prompt is required", runId },
+          { status: 400 }
+        );
+      }
+
+      if (!workspaceRoot || !fs.existsSync(workspaceRoot)) {
+        return NextResponse.json(
+          { ok: false, error: "workspace is not selected", runId },
+          { status: 400 }
+        );
+      }
+
+      const authCliPrompt = buildAuthCliPrompt({
+        prompt,
+        responseMode,
+        responseStyle: body.responseStyle || "",
+        executionProfile
+      });
+
+      const execution = await runAuthCliOneshot({
+        runId,
+        provider,
+        model,
+        prompt: authCliPrompt,
+        workspaceRoot,
+        mode
+      });
+
+
+      const stderrText = cleanAgentText(execution.stderr || "");
+      const output = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI 실행 결과가 비어 있습니다.";
+      const stdoutText = output;
+      const executionOk = Boolean(execution.ok && output.trim());
+      const durationMs = Date.now() - startedAt;
+      const status = executionOk ? "success" : "failed";
+
+      let compressedOutput = "";
+      let outputCompression = null;
+
+      try {
+        const compressed = compressCommandOutput({
+          command: execution.command || "auth-cli",
+          stdout: output || "",
+          stderr: stderrText || ""
+        });
+
+        compressedOutput = compressed.compressed || compressed.output || "";
+        outputCompression = {
+          kind: compressed.kind || "unknown",
+          ...(compressed.meta || {})
+        };
+      } catch (compressionError) {
+        outputCompression = {
+          kind: "failed",
+          error: compressionError?.message || String(compressionError)
+        };
+        logLine(runId, "auth-cli outputCompression failed=" + outputCompression.error);
+      }
+
+      try {
+        const saved = saveRun({
+          runId,
+          createdAt,
+          status,
+          ok: executionOk,
+          dryRun: false,
+          sessionId,
+          provider,
+          model,
+          mode,
+          skills,
+          toolsets,
+          responseMode,
+          executionProfile: executionProfile || "quick",
+          contextPolicy: contextPolicy || "minimal",
+          sessionContextUsed: false,
+          memorySyncUsed: false,
+          engine: "auth-cli",
+          workspaceRoot,
+          workspaceWsl,
+          prompt: displayPrompt || prompt,
+          output,
+          stderr: stderrText || "",
+          compressedOutput,
+          outputCompression,
+          error: executionOk ? "" : (stderrText || "Auth CLI 실행이 실패했습니다."),
+          exitCode: execution.exitCode,
+          durationMs,
+          usage: null,
+          tokenBudget: null,
+          memorySync: null,
+          workspaceCandidates: [],
+          command: execution.command || "auth-cli",
+          logPath: getLogPath()
+        });
+
+        logLine(runId, "SAVE auth-cli run=" + saved.runId + " status=" + saved.status);
+      } catch (saveError) {
+        logLine(runId, "SAVE ERROR auth-cli " + (saveError?.message || String(saveError)));
+      }
+
+      return NextResponse.json({
+        ok: Boolean(executionOk),
+        runId,
+        provider,
+        model,
+        mode,
+        status,
+        engine: "auth-cli",
+        command: execution.command,
+        output,
+        error: executionOk ? "" : (stderrText || "Auth CLI 실행이 실패했습니다."),
+        exitCode: execution.exitCode,
+        durationMs,
+        message: executionOk ? "Auth CLI execution finished." : "Auth CLI execution failed."
+      }, { status: executionOk ? 200 : 500 });
+    }
 
     if (!prompt.trim()) {
       return NextResponse.json(
@@ -467,9 +906,20 @@ let workspaceWsl = "";
     
 
     // permissionGuard: 모드별 실행 허용 검사
+    // Quick 모드는 파일 수정/명령 실행이 아니라 Direct API 호출이므로
+    // suggest 권한에서도 read 성격으로 허용한다.
+    const permissionProfile = resolveExecutionProfile({
+      executionProfile,
+      responseMode,
+      prompt,
+      skills,
+      toolsets,
+      mode
+    });
+
     const permCheck = checkPermission({
       mode,
-      action: dryRun ? "read" : "execute",
+      action: permissionProfile.executionProfile === "quick" ? "read" : (dryRun ? "read" : "execute"),
       target: prompt.slice(0, 200),
     });
     if (!permCheck.allowed) {

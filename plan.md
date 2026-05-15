@@ -1,4 +1,4 @@
-﻿# Mamabot Portable Agent — 작업계획서
+# Mamabot Portable Agent — 작업계획서
 
 F:\test\mamabot\PLAN.md 기준으로 이어서 작업하자. 현재 Hermes 실제 실행은 nvidia/nemotron-3-super-120b-a12b:free 모델로 성공했고, 다음 작업은 실행 결과 저장 / 최근 실행 목록 기능 추가야. PowerShell 명령어부터 줘.
 
@@ -4689,4 +4689,307 @@ AppShell이 dashboard로 이동
 WorkbenchChatPanel이 pendingWorkbenchPrompt를 읽어 setPrompt
 
 Team Coding Mode도 이 구조를 그대로 재사용한다.
+
+<!-- MAMABOT_DASHBOARD_HISTORY_NAME_FIX_20260514_BEGIN -->
+
+# Dashboard / History Naming and Restore Flow Fix - 2026-05-14
+
+## 변경 내용
+
+- Sidebar의 dashboard 표시명을 "작업대"에서 "대시보드"로 정리했다.
+- Sidebar에 "실행 이력" 메뉴를 추가했다.
+- unicode escape 문자열이 화면에 그대로 보이던 설명 문구를 JSX expression 방식으로 보정했다.
+- AppShell에서 ConversationSidebar의 run 클릭 시 activeTab을 history가 아니라 dashboard로 이동하도록 수정했다.
+- dashboard 내부는 기존처럼 DashboardPanel -> WorkbenchPanel -> WorkbenchChatPanel 흐름을 유지한다.
+- WorkbenchPanel 화면 제목도 "대시보드"로 통일했다.
+
+## 유지한 구조
+
+- 내부 탭 id는 변경하지 않았다.
+- dashboard = 대시보드 / Workbench 실행 화면
+- chat = 작업 채팅 / 기존 AgentPanel
+- history = 실행 이력
+- workflows = 워크플로우 템플릿
+
+## 수정 파일
+
+- app/components/Sidebar.jsx
+- app/components/AppShell.jsx
+- app/components/WorkbenchPanel.jsx
+- plan.md
+
+## 다음 확인 사항
+
+1. 사이드바 첫 메뉴가 "대시보드"로 보이는지 확인한다.
+2. "실행 이력" 메뉴가 보이는지 확인한다.
+3. 실행 이력 run 클릭 시 대시보드에 prompt/output이 복원되는지 확인한다.
+4. 워크플로우 메뉴가 템플릿 화면으로 분리되어 있는지 확인한다.
+
+<!-- MAMABOT_DASHBOARD_HISTORY_NAME_FIX_20260514_END -->
+
+<!-- MAMABOT_AGENT_REGISTRY_PROVIDER_SPLIT_20260514_BEGIN -->
+
+# Agent Registry / Provider Split - 2026-05-14
+
+## 결정
+
+Mamabot은 모델 목록 중심이 아니라 실행 대상 Agent 중심으로 구조를 분리한다.
+
+## 분리 기준
+
+- Claude Code / Codex CLI / Gemini CLI / OpenCode는 auth-cli Agent로 관리한다.
+- OpenRouter / OpenAI API / Anthropic API / Gemini API는 api-model Provider로 관리한다.
+- Ollama는 local Provider로 관리한다.
+- 무료 모델은 OpenRouter API Provider 안에서 많이 사용할 수 있게 유지한다.
+- OAuth/구독형 CLI Agent 실행 시 API Key 환경변수를 scrub하여 인증 충돌을 막는다.
+
+## 추가 파일
+
+- config/agents.json
+- app/lib/agentRegistry.js
+- app/lib/agentEnv.js
+- app/api/agents/route.js
+
+## 다음 작업
+
+1. /api/agents API 응답 확인
+2. AgentPanel 상단 선택기를 "모델 선택" 중심에서 "실행 대상 선택" 중심으로 변경
+3. 실행 대상이 openrouter/hermes일 때만 OpenRouter 무료 모델 선택 UI 노출
+4. Claude Code / Codex / Gemini CLI 선택 시 OAuth 상태와 CLI 상태만 표시
+5. /api/agent/run에서 agentId/backendKind/envPolicy를 저장하고 env scrubber 적용
+
+<!-- MAMABOT_AGENT_REGISTRY_PROVIDER_SPLIT_20260514_END -->
+
+<!-- MAMABOT_AUTH_UI_SINGLE_OWNER_20260514_BEGIN -->
+
+# Auth UI Single Owner - 2026-05-14
+
+## 결정
+
+인증/로그인/토큰 갱신 UI는 모델 / 인증 화면으로 통일한다.
+
+## 역할 분리
+
+- 대시보드: 작업 실행과 설정된 모델 사용에 집중한다.
+- 작업 채팅: 실행 대상 Agent 선택과 실행에 집중한다.
+- 모델 / 인증: API Key, OAuth Provider, CLI Agent 로그인/갱신을 전담한다.
+
+## 변경 내용
+
+- AgentPanel의 중복 OAuth 로그인 / 갱신 버튼을 제거했다.
+- AgentPanel에는 OAuth CLI Agent 안내 문구만 남겼다.
+- WorkbenchChatPanel에는 로그인 UI를 넣지 않는다.
+
+## 다음 작업
+
+1. 모델 / 인증 화면의 CLI Agents 섹션을 Claude Code / Codex CLI / Gemini CLI 중심으로 정리한다.
+2. 각 CLI Agent에 로그인/갱신 버튼과 상태 확인 버튼을 연결한다.
+3. 대시보드와 작업 채팅은 인증 버튼 없이 실행 대상과 모델 선택만 표시한다.
+
+<!-- MAMABOT_AUTH_UI_SINGLE_OWNER_20260514_END -->
+
+<!-- MAMABOT_MODELS_PANEL_CLI_MODEL_BADGES_20260514_BEGIN -->
+
+# ModelsPanel CLI Agent Model Badges - 2026-05-14
+
+## 변경 내용
+
+- 모델 / 인증 화면의 CLI Agents 영역을 Claude Code / Codex CLI / Gemini CLI 카드 구조로 확장했다.
+- 각 CLI Agent 카드에 Login / Refresh / 상태 Badge를 표시한다.
+- /api/model-badges 기반으로 사용 가능 모델을 최신순으로 표시한다.
+- 모델별 최신 / 추천 / 안정 / 빠름 / 코딩 / 추론 / 구독 / CLI Badge를 표시한다.
+
+## 유지 원칙
+
+- 로그인/토큰 갱신은 모델 / 인증 화면에서만 관리한다.
+- 대시보드와 작업 채팅에는 중복 로그인 버튼을 추가하지 않는다.
+- 대시보드는 설정된 모델과 즐겨찾기 모델 중심으로 유지한다.
+
+## 다음 작업
+
+1. 브라우저에서 CLI Agents 카드 3개 표시 확인
+2. 각 카드의 사용 가능 모델 뱃지 확인
+3. 대시보드 무료 모델 드롭다운에 FREE / 인기 / 최신 / 64K+ 뱃지 연결
+4. Codex CLI / Gemini CLI status route 추가
+
+<!-- MAMABOT_MODELS_PANEL_CLI_MODEL_BADGES_20260514_END -->
+
+<!-- MAMABOT_MODELS_PANEL_CLI_LABEL_CLEANUP_20260514_BEGIN -->
+
+# ModelsPanel CLI Label Cleanup - 2026-05-14
+
+## 변경 내용
+
+- 모델 / 인증 화면의 OAuth Providers 섹션명을 CLI 인증 에이전트로 변경했다.
+- Claude Code가 connected 상태일 때 Not installed로 보이던 설명을 Connected로 표시하도록 수정했다.
+
+<!-- MAMABOT_MODELS_PANEL_CLI_LABEL_CLEANUP_20260514_END -->
+
+<!-- MAMABOT_MODEL_HEALTH_CHECK_UI_20260514_BEGIN -->
+
+# Model Health Check UI - 2026-05-14
+
+## 변경 내용
+
+- 모델 / 인증 화면에 모델 생존 확인 섹션을 추가했다.
+- OpenRouter 모델은 최신 모델 목록에 존재하는지 기준으로 ALIVE / MISSING을 표시한다.
+- 즐겨찾기 모델에는 FREE / 64K+ / 대용량 badge를 함께 표시한다.
+- Claude Code / Codex CLI / Gemini CLI 모델 카탈로그는 /api/model-badges 기준으로 CATALOG OK / ERROR를 표시한다.
+
+## 주의
+
+- 이 단계의 생존 확인은 저비용 안전 확인이다.
+- 실제 모델 호출 ping은 비용/쿼터를 쓰므로 다음 단계에서 선택 모델 대상으로만 추가한다.
+
+<!-- MAMABOT_MODEL_HEALTH_CHECK_UI_20260514_END -->
+
+<!-- MAMABOT_CLI_AGENT_COMPACT_HEALTH_UI_20260514_BEGIN -->
+
+# CLI Agent Compact Health UI - 2026-05-14
+
+## 변경 내용
+
+- 모델 / 인증 화면의 CLI 인증 에이전트 헤더에 모델 생존 확인 버튼을 배치했다.
+- Claude Code / Codex CLI / Gemini CLI의 사용 가능 모델 목록을 기본 접힘 상태로 변경했다.
+- 각 Agent 카드에서 펼치기 / 접기 버튼으로 모델 목록을 확장할 수 있게 했다.
+- 섹션 제목을 OAuth Providers에서 CLI 인증 에이전트로 정리했다.
+
+<!-- MAMABOT_CLI_AGENT_COMPACT_HEALTH_UI_20260514_END -->
+
+<!-- MAMABOT_DASHBOARD_AUTH_MODELS_AND_STAR_BADGES_20260514_BEGIN -->
+
+# Dashboard Auth Models and Star Badges - 2026-05-14
+
+## 변경 내용
+
+- 대시보드 모델 드롭다운에 Claude Code / Codex CLI / Gemini CLI 인증방식 모델 optgroup을 추가했다.
+- 인증방식 모델 선택 시 provider는 해당 CLI Agent로, model은 실제 모델 id로 분리해 전송한다.
+- 검정 별 문자(★)를 컬러감 있는 별(🌟)로 변경했다.
+- 로그인/인증 버튼은 대시보드에 추가하지 않고 모델 / 인증 화면에서만 관리한다.
+
+## 다음 작업
+
+1. 대시보드 모델 드롭다운에서 인증방식 모델 optgroup 표시 확인
+2. 별 아이콘이 컬러 별로 보이는지 확인
+3. auth-cli provider 실행은 아직 runner가 없으므로 안전 차단 메시지가 뜨는지 확인
+4. 다음 단계에서 auth-cli 전용 runner 연결
+
+<!-- MAMABOT_DASHBOARD_AUTH_MODELS_AND_STAR_BADGES_20260514_END -->
+
+<!-- MAMABOT_DASHBOARD_AUTH_MODELS_FALLBACK_20260514_BEGIN -->
+
+# Dashboard Auth CLI Model Fallback - 2026-05-14
+
+## 변경 내용
+
+- 대시보드 모델 드롭다운의 인증방식 모델 그룹에 fallback 데이터를 추가했다.
+- /api/model-badges 로딩 전이나 실패 시에도 Claude Code / Codex CLI / Gemini CLI 모델이 보이도록 했다.
+- cliModelGroups 초기값을 fallback으로 설정했다.
+- loadCliModelGroups 호출을 초기 로딩 단계에서 보장했다.
+
+<!-- MAMABOT_DASHBOARD_AUTH_MODELS_FALLBACK_20260514_END -->
+
+<!-- MAMABOT_AUTHCLI_OPENROUTER_LEAK_GUARD_20260514_BEGIN -->
+
+# Auth CLI OpenRouter Leak Guard - 2026-05-14
+
+## 문제
+
+대시보드에서 Claude Code / Codex CLI / Gemini CLI 인증방식 모델을 선택해도 /api/agent/run의 Quick direct 분기가 먼저 OpenRouter direct 실행으로 빠지는 문제가 있었다.
+
+## 변경 내용
+
+- /api/agent/run에 isAuthCliProvider helper를 추가했다.
+- Claude Code / Codex CLI / Gemini CLI / OpenCode provider는 OpenRouter direct 분기 전에 early guard로 차단한다.
+- auth-cli 전용 runner가 붙기 전까지는 명확한 안내 메시지를 반환한다.
+
+## 다음 작업
+
+1. auth-cli 전용 runner 구현
+2. Claude Code 실행: claude CLI 기반
+3. Codex 실행: codex CLI 기반
+4. Gemini 실행: gemini CLI 기반
+5. 실행 결과를 기존 run history/session store에 저장
+
+<!-- MAMABOT_AUTHCLI_OPENROUTER_LEAK_GUARD_20260514_END -->
+
+<!-- MAMABOT_AUTH_CLI_RUNNER_V1_20260514_BEGIN -->
+
+# Auth CLI Runner V1 - 2026-05-14
+
+## 변경 내용
+
+- Claude Code / Codex CLI / Gemini CLI 모델 선택 시 OpenRouter direct 호출로 빠지지 않고 공식 CLI 명령으로 실행하도록 auth-cli runner를 추가했다.
+- Claude Code는 claude -p 프롬프트 --model 모델 형태로 실행한다.
+- Codex CLI는 codex exec 프롬프트 -m 모델 -C 작업폴더 형태로 실행한다.
+- Gemini CLI는 gemini -p 프롬프트 -m 모델 --skip-trust 형태로 실행한다.
+- OAuth/구독형 CLI 실행 시 관련 API Key 환경변수를 scrub한다.
+
+## 제한
+
+- V1은 결과를 즉시 화면에 반환하는 실행 경로다.
+- 기존 run history/session store 완전 저장 연동은 다음 단계에서 보강한다.
+- 긴 실행/스트리밍은 다음 단계에서 분리한다.
+
+<!-- MAMABOT_AUTH_CLI_RUNNER_V1_20260514_END -->
+
+<!-- MAMABOT_AUTHCLI_WORKSPACE_ROOT_FIX_20260514_BEGIN -->
+
+# Auth CLI Workspace Root Fix - 2026-05-14
+
+## 문제
+
+대시보드에는 workspace가 표시되지만 auth-cli runner가 workspaceRoot 계산 전에 실행되어 "workspace is not selected" 오류가 발생했다.
+
+## 변경 내용
+
+- WorkbenchChatPanel의 /api/agent/run payload에 workspaceRoot와 workspace를 명시적으로 포함했다.
+- /api/agent/run에서 auth-cli runner/guard 실행 전에 body.workspaceRoot/body.workspace 값을 workspaceRoot에 조기 바인딩하도록 수정했다.
+
+<!-- MAMABOT_AUTHCLI_WORKSPACE_ROOT_FIX_20260514_END -->
+
+<!-- MAMABOT_AUTH_CLI_RUNNER_ENV_QUOTING_FIX_20260514_BEGIN -->
+
+# Auth CLI Runner Env / Quoting Fix - 2026-05-14
+
+## 문제
+
+- Claude CLI는 직접 실행 시 로그인 상태였지만 Mamabot route에서는 Not logged in이 발생했다.
+- 원인은 auth-cli runner가 HOME/USERPROFILE/CLAUDE_CONFIG_DIR을 runtime 폴더로 강제 변경했기 때문이다.
+- Gemini CLI는 직접 실행 시 성공했지만 Mamabot route에서는 --prompt와 positional prompt가 동시에 들어갔다는 오류가 발생했다.
+- 원인은 shell:true 실행 중 prompt 인자 quoting이 깨진 것이다.
+- Codex CLI는 --skip-git-repo-check가 필요했다.
+
+## 변경 내용
+
+- auth-cli runner에서 HOME/USERPROFILE 강제 변경을 제거했다.
+- Claude Code runner에서 CLAUDE_CONFIG_DIR 강제 주입을 제거했다.
+- Windows에서는 PowerShell 명시 호출과 단일 인자 quoting으로 CLI를 실행하도록 수정했다.
+- Codex runner에 --skip-git-repo-check 옵션을 보장했다.
+
+## 다음 확인
+
+1. Claude route ping
+2. Gemini route ping
+3. Codex는 CLI 업데이트 또는 지원 모델 확인 후 재테스트
+
+<!-- MAMABOT_AUTH_CLI_RUNNER_ENV_QUOTING_FIX_20260514_END -->
+
+<!-- MAMABOT_CODEX_MODEL_COMPATIBILITY_BADGES_20260514_BEGIN -->
+
+# Codex Model Compatibility Badges - 2026-05-14
+
+## 변경 내용
+
+- Codex CLI 모델 목록에 현재 환경 기준 호환성 경고 badge를 추가했다.
+- gpt-5.5는 최신 모델이지만 현재 Codex CLI/계정 조합에서 업데이트 필요 오류가 발생할 수 있어 "업데이트 필요" badge를 표시한다.
+- gpt-5는 ChatGPT 로그인 방식에서 미지원 오류가 발생할 수 있어 "계정 미지원 가능" badge를 표시한다.
+- codex-default 후보를 추가해 모델명 지정 없이 Codex 기본 설정으로 테스트할 수 있게 했다.
+
+## 참고
+
+- Codex CLI 공식 문서는 ChatGPT 로그인 기반 사용을 지원한다.
+- 다만 GitHub 이슈상 gpt-5.5 / gpt-5.4 / gpt-5 모델은 CLI 버전과 계정 조건에 따라 오류가 발생할 수 있다.
+
+<!-- MAMABOT_CODEX_MODEL_COMPATIBILITY_BADGES_20260514_END -->
 

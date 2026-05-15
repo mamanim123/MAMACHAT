@@ -1,10 +1,5 @@
 ﻿$ErrorActionPreference = "Stop"
 
-chcp 65001 | Out-Null
-[Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-
 function Convert-ToWslPath([string]$Path) {
   $full = [System.IO.Path]::GetFullPath($Path)
   $drive = $full.Substring(0, 1).ToLowerInvariant()
@@ -15,6 +10,15 @@ function Convert-ToWslPath([string]$Path) {
   return "/mnt/$drive$rest"
 }
 
+
+chcp 65001 | Out-Null
+[Console]::InputEncoding  = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+$root = Split-Path -Parent $PSScriptRoot
+Set-Location $root
+
 function Test-Dashboard {
   try {
     $res = Invoke-WebRequest "http://127.0.0.1:9119/api/status" -UseBasicParsing -TimeoutSec 2
@@ -24,23 +28,9 @@ function Test-Dashboard {
   }
 }
 
-$root = Split-Path -Parent $PSScriptRoot
-Set-Location $root
-
-$wslRoot = Convert-ToWslPath $root
-$agent = "$wslRoot/runtime/hermes/home/hermes-agent"
-$hermesBin = "$agent/venv/bin/hermes"
-
-$logDirWin = Join-Path $root "runtime\hermes\logs"
-$dashboardLogWin = Join-Path $logDirWin "dashboard-9119.log"
-
-$logDirWsl = "$wslRoot/runtime/hermes/logs"
-$dashboardLogWsl = "$logDirWsl/dashboard-9119.log"
-
 Write-Host ""
-Write-Host "=== Mamabot 시작 ===" -ForegroundColor Cyan
+Write-Host "=== Mamabot Start ===" -ForegroundColor Cyan
 Write-Host "Root: $root"
-Write-Host "WSL : $wslRoot"
 
 Write-Host ""
 Write-Host "=== 기본 파일 확인 ===" -ForegroundColor Cyan
@@ -50,10 +40,13 @@ if (!(Test-Path "node_modules")) {
   & "$root\scripts\setup-office-hermes.ps1"
 }
 
-$hermesCheck = wsl bash -lc "test -x '$hermesBin' && echo OK || echo MISSING"
+$wslRoot = Convert-ToWslPath $root
+$agent = "$wslRoot/runtime/hermes/home/hermes-agent"
 
-if ($hermesCheck -notmatch "OK") {
-  Write-Host "Hermes 실행 파일이 없습니다. Hermes 설정을 먼저 복구합니다." -ForegroundColor Yellow
+$venvOk = wsl bash -lc "test -x '$agent/venv/bin/hermes' && echo OK || echo MISSING"
+
+if ($venvOk -notmatch "OK") {
+  Write-Host "Hermes venv 또는 hermes 실행 파일이 없습니다. setup-office.bat을 먼저 실행합니다." -ForegroundColor Yellow
   & "$root\scripts\setup-office-hermes.ps1" -SkipNpmInstall
 }
 
@@ -65,48 +58,29 @@ if (Test-Dashboard) {
 } else {
   Write-Host "Hermes Dashboard가 꺼져 있어 백그라운드로 실행합니다." -ForegroundColor Yellow
 
-  New-Item -ItemType Directory -Force $logDirWin | Out-Null
+  $dashboardLog = "$wslRoot/runtime/hermes/logs/dashboard-9119.log"
+  $dashboardPid = "$wslRoot/runtime/hermes/logs/dashboard-9119.pid"
 
-  # 포트는 죽어 있는데 프로세스만 남은 경우 정리
-  wsl bash -lc "pkill -f 'hermes dashboard.*9119' 2>/dev/null || true"
-  wsl bash -lc "mkdir -p '$logDirWsl'"
-
-  $dashboardCommand = "export HOME='$wslRoot/runtime/hermes/home'; cd '$agent'; exec ./venv/bin/hermes dashboard --no-open --host 127.0.0.1 --port 9119 >> '$dashboardLogWsl' 2>&1"
-
-  Start-Process -FilePath "wsl.exe" `
-    -ArgumentList @("bash", "-lc", $dashboardCommand) `
-    -WindowStyle Hidden
+  wsl bash -lc "mkdir -p '$wslRoot/runtime/hermes/logs'"
+  wsl bash -lc "cd '$wslRoot' && nohup bash scripts/start-hermes-dashboard-wsl.sh > '$dashboardLog' 2>&1 & echo \$! > '$dashboardPid'"
 
   Write-Host "Dashboard 시작 대기 중..." -ForegroundColor Cyan
 
   $ready = $false
 
-  for ($i = 1; $i -le 45; $i++) {
+  for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 1
 
     if (Test-Dashboard) {
       $ready = $true
       break
     }
-
-    if ($i % 5 -eq 0) {
-      Write-Host "대기 중... $i초" -ForegroundColor DarkGray
-    }
   }
 
   if (!$ready) {
-    Write-Host ""
-    Write-Host "Dashboard가 45초 안에 응답하지 않았습니다." -ForegroundColor Red
-    Write-Host "로그 확인:" -ForegroundColor Yellow
-    Write-Host $dashboardLogWin -ForegroundColor Yellow
-
-    if (Test-Path $dashboardLogWin) {
-      Get-Content $dashboardLogWin -Tail 80
-    } else {
-      Write-Host "로그 파일이 아직 생성되지 않았습니다." -ForegroundColor Yellow
-    }
-
-    throw "Hermes Dashboard 시작 실패"
+    Write-Host "Dashboard가 30초 안에 응답하지 않습니다." -ForegroundColor Red
+    Write-Host "새로 열린 Dashboard 창의 에러 메시지를 확인하세요." -ForegroundColor Yellow
+    throw "Hermes Dashboard startup failed"
   }
 
   Write-Host "Hermes Dashboard 실행 확인 완료" -ForegroundColor Green

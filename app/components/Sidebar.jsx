@@ -3,8 +3,9 @@
 import { useState } from "react";
 
 const items = [
-  { id: "dashboard", label: "\uC791\uC5C5\uB300", icon: "\u{1F3E0}" },
+  { id: "dashboard", label: "\uB300\uC2DC\uBCF4\uB4DC", icon: "\u{1F3E0}" },
   { id: "chat", label: "\uC791\uC5C5 \uCC44\uD305", icon: "\u{1F4AC}" },
+  { id: "history", label: "\uC2E4\uD589 \uC774\uB825", icon: "\u{1F5C2}\uFE0F" },
   { id: "sessions", label: "\uC791\uC5C5 \uC138\uC158", icon: "\u{23F1}\uFE0F" },
   { id: "patches", label: "\uD328\uCE58 \uC2B9\uC778", icon: "\u{1F9E9}" },
   { id: "workflows", label: "\uC6CC\uD06C\uD50C\uB85C\uC6B0", icon: "\u{1F501}" },
@@ -89,8 +90,8 @@ export default function Sidebar({ activeTab, onChange }) {
             Mamabot
           </div>
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-            \uD3EC\uD130\uBE14 \uC5D0\uC774\uC804\uD2B8 \uC791\uC5C5\uB300
-          </div>
+            {"\uD3EC\uD130\uBE14 \uC5D0\uC774\uC804\uD2B8 \uC791\uC5C5\uB300"}
+</div>
         </div>
       </div>
 
@@ -162,8 +163,8 @@ export default function Sidebar({ activeTab, onChange }) {
         {expanded ? (
           <>
             <div style={{ fontSize: 12, color: "#94a3b8" }}>
-              \uC8FC \uC2E4\uD589 \uD658\uACBD
-            </div>
+              {"\uC8FC \uC2E4\uD589 \uD658\uACBD"}
+</div>
             <div style={{ fontWeight: 800, marginTop: 4 }}>Mama Agent</div>
           </>
         ) : (

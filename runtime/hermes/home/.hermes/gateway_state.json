@@ -1,1 +1,0 @@
-{"pid":9,"kind":"hermes-gateway","argv":["cli.py","--gateway","--host","127.0.0.1","--port","9119"],"start_time":8178,"gateway_state":"stopped","exit_reason":null,"restart_requested":false,"active_agents":0,"platforms":{},"updated_at":"2026-05-14T01:16:15.299367+00:00"}

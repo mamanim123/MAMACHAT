@@ -14,15 +14,95 @@ import {
 import AgentRunLogPanel from "./AgentRunLogPanel.jsx";
 import AgentRunHistoryPanel from "./AgentRunHistoryPanel.jsx";
 
-const providerOptions = [
-  { id: "hermes", label: "Hermes 기본 설정 사용" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "openai", label: "OpenAI" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "gemini", label: "Gemini" },
-  { id: "codex", label: "Codex (아직 미연결)" },
-  { id: "claude_code", label: "Claude Code (아직 미연결)" },
-  { id: "openclaude", label: "OpenClaude (아직 미연결)" }
+const fallbackAgentOptions = [
+  {
+    id: "hermes",
+    label: "Hermes Agent",
+    kind: "hermes",
+    badge: "AGENT",
+    authMode: "hermes-provider",
+    modelSource: "hermes-native",
+    allowApiModelPicker: true,
+    allowFreeModels: true,
+    envPolicy: "hermes"
+  },
+  {
+    id: "claude-code",
+    label: "Claude Code",
+    kind: "auth-cli",
+    badge: "OAUTH",
+    authMode: "subscription-oauth",
+    modelSource: "cli-native",
+    allowApiModelPicker: false,
+    allowFreeModels: false,
+    envPolicy: "claude-code-oauth"
+  },
+  {
+    id: "codex-cli",
+    label: "Codex CLI",
+    kind: "auth-cli",
+    badge: "OAUTH",
+    authMode: "chatgpt-oauth",
+    modelSource: "cli-native",
+    allowApiModelPicker: false,
+    allowFreeModels: false,
+    envPolicy: "codex-chatgpt-oauth"
+  },
+  {
+    id: "gemini-cli",
+    label: "Gemini CLI",
+    kind: "auth-cli",
+    badge: "OAUTH",
+    authMode: "google-login",
+    modelSource: "cli-native",
+    allowApiModelPicker: false,
+    allowFreeModels: false,
+    envPolicy: "gemini-google-login"
+  },
+  {
+    id: "opencode",
+    label: "OpenCode",
+    kind: "auth-cli",
+    badge: "OAUTH",
+    authMode: "agent-native",
+    modelSource: "cli-native",
+    allowApiModelPicker: false,
+    allowFreeModels: false,
+    envPolicy: "opencode-native"
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter API",
+    kind: "api-model",
+    badge: "FREE+API",
+    authMode: "api-key",
+    modelSource: "openrouter-live",
+    allowApiModelPicker: true,
+    allowFreeModels: true,
+    envPolicy: "api-openrouter"
+  },
+  {
+    id: "gemini-api",
+    label: "Gemini API",
+    kind: "api-model",
+    badge: "API",
+    authMode: "api-key",
+    modelSource: "gemini-api",
+    allowApiModelPicker: true,
+    allowFreeModels: true,
+    envPolicy: "api-gemini"
+  },
+  {
+    id: "ollama",
+    label: "Ollama Local",
+    kind: "local",
+    badge: "LOCAL",
+    authMode: "none",
+    modelSource: "ollama",
+    allowApiModelPicker: false,
+    allowFreeModels: false,
+    envPolicy: "local-ollama"
+  }
 ];
 
 const modeOptions = [
@@ -65,6 +145,10 @@ const presetButtonStyle = {
 export default function AgentPanel({ activeSessionId = "", onSessionChanged = null } = {}) {
   const [prompt, setPrompt] = useState("");
   const [provider, setProvider] = useState("hermes");
+  const [agentId, setAgentId] = useState("hermes");
+  const [agentOptions, setAgentOptions] = useState(fallbackAgentOptions);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentLoadError, setAgentLoadError] = useState("");
   const [mode, setMode] = useState("suggest");
   const [model, setModel] = useState("");
   const [customModel, setCustomModel] = useState("");
@@ -88,6 +172,31 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [activeSessionInfo, setActiveSessionInfo] = useState(null);
   const [error, setError] = useState("");
+
+  async function loadAgents() {
+    setAgentLoading(true);
+    setAgentLoadError("");
+
+    try {
+      const res = await fetch("/api/agents", { cache: "no-store" });
+      const data = await res.json();
+
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || "Failed to load agents");
+      }
+
+      const nextAgents = Array.isArray(data.agents) && data.agents.length > 0
+        ? data.agents
+        : fallbackAgentOptions;
+
+      setAgentOptions(nextAgents);
+    } catch (err) {
+      setAgentLoadError(err.message || String(err));
+      setAgentOptions(fallbackAgentOptions);
+    } finally {
+      setAgentLoading(false);
+    }
+  }
 
   async function loadLiveModels(refresh = false) {
     setModelLoading(true);
@@ -143,6 +252,10 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
       loadLiveModels(false);
     }
   }
+
+  useEffect(() => {
+    loadAgents();
+  }, []);
 
   useEffect(() => {
     loadLiveModels(false);
@@ -218,6 +331,17 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
     return combinedModelOptions.find((item) => item.id === model) || selectedPreset;
   }, [combinedModelOptions, selectedPreset, model]);
 
+  const selectedAgent = useMemo(() => {
+    return (
+      agentOptions.find((item) => item.id === agentId) ||
+      agentOptions.find((item) => item.id === "hermes") ||
+      fallbackAgentOptions[0]
+    );
+  }, [agentOptions, agentId]);
+
+  const showApiModelPicker = Boolean(selectedAgent && selectedAgent.allowApiModelPicker);
+  const showAuthCliNotice = selectedAgent && selectedAgent.kind === "auth-cli";
+
   const modelWarning = useMemo(() => {
     if (!model || model === "__custom__") return "";
     return getModelWarning(model);
@@ -259,6 +383,32 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
       setSkillsData(null);
     } finally {
       setLoadingMeta(false);
+    }
+  }
+
+  function resolveProviderForAgent(agent) {
+    if (!agent) return "hermes";
+    if (agent.id === "hermes") return "hermes";
+    if (agent.id === "openrouter") return "openrouter";
+    if (agent.id === "gemini-api") return "gemini";
+    if (agent.id === "openai-api") return "openai";
+    if (agent.id === "anthropic-api") return "anthropic";
+    return agent.id;
+  }
+
+  function handleAgentChange(value) {
+    const nextAgent =
+      agentOptions.find((item) => item.id === value) ||
+      fallbackAgentOptions.find((item) => item.id === value);
+
+    setAgentId(value);
+    setProvider(resolveProviderForAgent(nextAgent));
+
+    if (!nextAgent || !nextAgent.allowApiModelPicker) {
+      setModel("");
+      setCustomModel("");
+      setFavoritesOnly(false);
+      setModelSearch("");
     }
   }
 
@@ -482,8 +632,8 @@ ${warn}
             Provider
           </label>
           <select
-            value={provider}
-            onChange={(event) => setProvider(event.target.value)}
+            value={agentId}
+              onChange={(event) => handleAgentChange(event.target.value)}
             style={{
               width: "100%",
               border: "1px solid #d1d5db",
@@ -492,9 +642,9 @@ ${warn}
               background: "#ffffff"
             }}
           >
-            {providerOptions.map((item) => (
+            {agentOptions.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.label}
+                {item.label} {item.badge ? "· " + item.badge : ""}
               </option>
             ))}
           </select>
@@ -524,7 +674,63 @@ ${warn}
         </div>
 
 
-        <div>
+        {selectedAgent ? (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid #dbeafe",
+              background: selectedAgent.kind === "auth-cli" ? "#f5f3ff" : "#eff6ff",
+              color: selectedAgent.kind === "auth-cli" ? "#4c1d95" : "#1e3a8a",
+              fontSize: 13,
+              lineHeight: 1.55
+            }}
+          >
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <strong>{selectedAgent.label}</strong>
+              <span
+                style={{
+                  background: selectedAgent.kind === "auth-cli" ? "#7c3aed" : "#2563eb",
+                  color: "#ffffff",
+                  borderRadius: 999,
+                  padding: "1px 7px",
+                  fontSize: 11,
+                  fontWeight: 900
+                }}
+              >
+                {selectedAgent.badge || selectedAgent.kind}
+              </span>
+              <span>{selectedAgent.authMode}</span>
+            </div>
+
+            {showAuthCliNotice ? (
+              <div style={{ marginTop: 6 }}>
+                {"OAuth/구독형 CLI Agent입니다. 로그인/토큰 갱신은 모델 / 인증 화면에서만 관리합니다. 이 화면에서는 실행 대상만 선택합니다."}
+              </div>
+            ) : selectedAgent.kind === "api-model" || selectedAgent.kind === "hermes" ? (
+              <div style={{ marginTop: 6 }}>
+                {"API/모델 선택 가능 대상입니다. 무료 모델과 즐겨찾기 모델 목록을 사용할 수 있습니다."}
+              </div>
+            ) : (
+              <div style={{ marginTop: 6 }}>
+                {"Local Provider입니다. API Key 없이 로컬 endpoint 상태를 기준으로 실행합니다."}
+              </div>
+            )}
+
+            <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
+              Agent ID: {selectedAgent.id} · envPolicy: {selectedAgent.envPolicy || "-"}
+            </div>
+
+            {agentLoadError ? (
+              <div style={{ marginTop: 7, color: "#991b1b", fontSize: 12 }}>
+                {agentLoadError}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div style={{ display: showApiModelPicker ? "block" : "none" }}>
           <div
             style={{
               display: "flex",
@@ -535,7 +741,7 @@ ${warn}
             }}
           >
             <label style={{ fontSize: 13, fontWeight: 900 }}>
-              {"\uBAA8\uB378 \u00B7 \uC790\uB3D9 \uBAA9\uB85D / \uC990\uACA8\uCC3E\uAE30"}
+              {"API \uBAA8\uB378 \u00B7 \uBB34\uB8CC / \uC790\uB3D9 \uBAA9\uB85D / \uC990\uACA8\uCC3E\uAE30"}
             </label>
 
             <button
@@ -666,7 +872,7 @@ ${warn}
         </div>
       </div>
 
-      {selectedModelInfo ? (
+      {showApiModelPicker && selectedModelInfo ? (
         <div
           style={{
             marginBottom: 14,

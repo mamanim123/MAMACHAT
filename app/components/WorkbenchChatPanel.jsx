@@ -22,6 +22,69 @@ function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+const AUTH_CLI_MODEL_PREFIX = "__authcli__::";
+
+function makeAuthCliModelValue(agentId, modelId) {
+  return AUTH_CLI_MODEL_PREFIX + agentId + "::" + modelId;
+}
+
+function parseAuthCliModelValue(value = "") {
+  const text = String(value || "");
+
+  if (!text.startsWith(AUTH_CLI_MODEL_PREFIX)) return null;
+
+  const rest = text.slice(AUTH_CLI_MODEL_PREFIX.length);
+  const divider = rest.indexOf("::");
+
+  if (divider === -1) return null;
+
+  return {
+    agentId: rest.slice(0, divider),
+    modelId: rest.slice(divider + 2)
+  };
+}
+
+function formatBadgeText(badges = []) {
+  if (!Array.isArray(badges) || badges.length === 0) return "";
+  return " · " + badges.slice(0, 4).join(" · ");
+}
+
+const DASHBOARD_AUTH_CLI_MODEL_GROUPS = [
+  {
+    agentId: "claude-code",
+    label: "Claude Code",
+    models: [
+      { id: "claude-opus-4-7", label: "Claude Opus 4.7", badges: ["최신", "추론", "구독", "CLI"] },
+      { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", badges: ["추천", "코딩", "안정", "구독"] },
+      { id: "claude-opus-4-6", label: "Claude Opus 4.6", badges: ["추론", "구독", "CLI"] },
+      { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", badges: ["빠름", "가벼움", "구독", "CLI"] },
+      { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", badges: ["안정", "코딩", "구독", "CLI"] }
+    ]
+  },
+  {
+    agentId: "codex-cli",
+    label: "Codex CLI",
+    models: [
+      { id: "gpt-5.5", label: "GPT-5.5", badges: ["최신", "업데이트 필요", "계정/버전 확인", "CLI"] },
+      { id: "gpt-5.4", label: "GPT-5.4", badges: ["기본 후보", "업데이트 필요", "CLI"] },
+      { id: "gpt-5", label: "GPT-5", badges: ["계정 미지원 가능", "CLI"] },
+      { id: "codex-default", label: "Codex 기본 모델", badges: ["자동선택", "테스트 필요", "CLI"] }
+    ]
+  },
+  {
+    agentId: "gemini-cli",
+    label: "Gemini CLI",
+    models: [
+      { id: "auto-gemini-3", label: "Auto Gemini 3", badges: ["최신", "추천", "자동선택", "CLI"] },
+      { id: "gemini-3-pro-preview", label: "Gemini 3 Pro Preview", badges: ["최신", "Preview", "추론", "CLI"] },
+      { id: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview", badges: ["최신", "Preview", "빠름", "CLI"] },
+      { id: "auto-gemini-2.5", label: "Auto Gemini 2.5", badges: ["추천", "안정", "자동선택", "CLI"] },
+      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", badges: ["안정", "추론", "대용량", "CLI"] },
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", badges: ["빠름", "안정", "CLI"] }
+    ]
+  }
+];
+
 function cleanAgentText(value) {
   const raw = String(value || "");
 
@@ -132,6 +195,7 @@ export default function WorkbenchChatPanel({
   const [executionProfile, setExecutionProfile] = useState("quick");
   const [favorites, setFavorites] = useState([]);
   const [liveModels, setLiveModels] = useState([]);
+  const [cliModelGroups, setCliModelGroups] = useState(DASHBOARD_AUTH_CLI_MODEL_GROUPS);
   const [skills, setSkills] = useState("");
   const [toolsets, setToolsets] = useState("");
   const [workspacePath, setWorkspacePath] = useState(workspaceRoot || "");
@@ -297,6 +361,37 @@ export default function WorkbenchChatPanel({
     setPickerOpen(false);
     setWorkspacePath(folderPath);
     saveWorkspace(folderPath);
+  }
+
+  async function loadCliModelGroups() {
+    try {
+      const agentIds = [
+        ["claude-code", "Claude Code"],
+        ["codex-cli", "Codex CLI"],
+        ["gemini-cli", "Gemini CLI"]
+      ];
+
+      const results = await Promise.all(
+        agentIds.map(async ([agentId, label]) => {
+          const res = await fetch("/api/model-badges?agentId=" + encodeURIComponent(agentId), {
+            cache: "no-store"
+          });
+
+          const data = await res.json();
+
+          return {
+            agentId,
+            label,
+            models: Array.isArray(data.models) ? data.models : []
+          };
+        })
+      );
+
+      const nextGroups = results.filter((item) => item.models.length > 0);
+      setCliModelGroups(nextGroups.length > 0 ? nextGroups : DASHBOARD_AUTH_CLI_MODEL_GROUPS);
+    } catch (err) {
+      setCliModelGroups(DASHBOARD_AUTH_CLI_MODEL_GROUPS);
+    }
   }
 
   async function loadModels() {
@@ -704,6 +799,20 @@ export default function WorkbenchChatPanel({
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const parsedAuthModelForRun = parseAuthCliModelValue(model);
+    const requestProvider = parsedAuthModelForRun ? parsedAuthModelForRun.agentId : provider;
+    const requestModelRaw = parsedAuthModelForRun ? parsedAuthModelForRun.modelId : model;
+    const requestModel =
+      ["codex-default", "claude-default", "gemini-default"].includes(requestModelRaw)
+        ? ""
+        : requestModelRaw;
+
+    const runWorkspace = String(
+      workspacePath ||
+      (typeof workspaceRoot !== "undefined" && workspaceRoot) ||
+      "F:\\mamabot"
+    ).trim();
+
     try {
       const res = await fetch("/api/agent/run", {
         method: "POST",
@@ -712,11 +821,14 @@ export default function WorkbenchChatPanel({
         },
         signal: controller.signal,
         body: JSON.stringify({
+          workspaceRoot: runWorkspace,
+          workspace: runWorkspace,
           prompt: apiPrompt,
           displayPrompt: trimmed,
-          provider,
+          provider: requestProvider,
+          agentId: requestProvider,
           mode,
-          model,
+          model: requestModel,
           skills,
           toolsets,
           responseMode: responseStyle,
@@ -933,8 +1045,17 @@ export default function WorkbenchChatPanel({
           value={model}
           onChange={(event) => {
             const value = event.target.value;
+            const parsedAuthModel = parseAuthCliModelValue(value);
+
             setModel(value);
-            if (value) setProvider("openrouter");
+
+            if (parsedAuthModel) {
+              setProvider(parsedAuthModel.agentId);
+            } else if (value) {
+              setProvider("openrouter");
+            } else {
+              setProvider("hermes");
+            }
           }}
           style={{
             width: 360,
@@ -958,12 +1079,29 @@ export default function WorkbenchChatPanel({
             <optgroup label="즐겨찾기 모델">
               {favoriteModels.map((item) => (
                 <option key={item.id} value={item.id}>
-                  ★ {item.name}
+                  🌟 {item.name}
                 </option>
               ))}
             </optgroup>
           ) : null}
-          {liveModels.slice(0, 30).map((item) => (
+          {cliModelGroups.length > 0 ? (
+            <>
+              {cliModelGroups.map((group) => (
+                <optgroup key={group.agentId} label={"인증방식 모델 · " + group.label}>
+                  {group.models.map((item) => (
+                    <option
+                      key={group.agentId + ":" + item.id}
+                      value={makeAuthCliModelValue(group.agentId, item.id)}
+                    >
+                      {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </>
+          ) : null}
+
+          {liveModels.slice(0, 200).map((item) => (
             <option key={item.id} value={item.id}>
               {item.name || item.id}
             </option>

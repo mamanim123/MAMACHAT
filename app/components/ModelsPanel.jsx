@@ -12,6 +12,8 @@ function Badge({ tone = "good", children }) {
 
   const c = colors[tone] || colors.good;
 
+  
+
   return (
     <span
       style={{
@@ -107,6 +109,11 @@ export default function ModelsPanel() {
   const [envVars, setEnvVars] = useState(null);
   const [oauthProviders, setOauthProviders] = useState(null);
   const [claudeStatus, setClaudeStatus] = useState(null);
+  const [cliModelBadges, setCliModelBadges] = useState({});
+  const [startingCliAgent, setStartingCliAgent] = useState("");
+  const [modelHealthChecking, setModelHealthChecking] = useState(false);
+  const [modelHealth, setModelHealth] = useState(null);
+  const [expandedCliAgents, setExpandedCliAgents] = useState({});
   const [startingClaudeCode, setStartingClaudeCode] = useState(false);
   const [query, setQuery] = useState("");
   const [envKey, setEnvKey] = useState("");
@@ -221,6 +228,138 @@ export default function ModelsPanel() {
     }
   }
 
+  async function checkModelHealth() {
+    setModelHealthChecking(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const [modelsResult, favoritesResult, claudeResult, codexResult, geminiResult] = await Promise.allSettled([
+        fetchJson("/api/models/openrouter?refresh=true"),
+        fetchJson("/api/models/favorites"),
+        fetchJson("/api/model-badges?agentId=claude-code"),
+        fetchJson("/api/model-badges?agentId=codex-cli"),
+        fetchJson("/api/model-badges?agentId=gemini-cli")
+      ]);
+
+      const openrouterModels =
+        modelsResult.status === "fulfilled" && Array.isArray(modelsResult.value.models)
+          ? modelsResult.value.models
+          : [];
+
+      const favorites =
+        favoritesResult.status === "fulfilled" && Array.isArray(favoritesResult.value.favorites)
+          ? favoritesResult.value.favorites
+          : [];
+
+      const liveMap = new Map();
+
+      for (const item of openrouterModels) {
+        if (item?.id) liveMap.set(item.id, item);
+      }
+
+      const favoriteStatus = favorites.map((id) => {
+        const found = liveMap.get(id);
+        const contextLength = Number(found?.contextLength || found?.context_length || found?.minContext || 0);
+
+        return {
+          id,
+          label: found?.label || found?.name || id,
+          alive: Boolean(found),
+          contextLength,
+          badges: [
+            found ? "ALIVE" : "MISSING",
+            String(id).includes(":free") ? "FREE" : "",
+            contextLength >= 64000 ? "64K+" : "",
+            contextLength >= 200000 ? "대용량" : ""
+          ].filter(Boolean)
+        };
+      });
+
+      const cliStatus = [
+        ["claude-code", "Claude Code", claudeResult],
+        ["codex-cli", "Codex CLI", codexResult],
+        ["gemini-cli", "Gemini CLI", geminiResult]
+      ].map(([agentId, label, result]) => {
+        const ok = result.status === "fulfilled" && result.value?.ok !== false;
+        const count = ok ? Number(result.value?.count || 0) : 0;
+        const latest = ok ? result.value?.latest || null : null;
+
+        return {
+          agentId,
+          label,
+          ok,
+          count,
+          latestLabel: latest?.label || latest?.id || "",
+          badges: [
+            ok ? "CATALOG OK" : "CATALOG ERROR",
+            count > 0 ? count + " models" : "",
+            latest ? "최신: " + (latest.label || latest.id) : ""
+          ].filter(Boolean)
+        };
+      });
+
+      setModelHealth({
+        checkedAt: new Date().toLocaleString(),
+        openrouterCount: openrouterModels.length,
+        favoriteStatus,
+        cliStatus
+      });
+
+      setMessage("모델 생존 확인 완료");
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setModelHealthChecking(false);
+    }
+  }
+
+  async function loadCliModelBadges() {
+    const agentIds = ["claude-code", "codex-cli", "gemini-cli"];
+
+    try {
+      const results = await Promise.all(
+        agentIds.map(async (agentId) => {
+          const data = await fetchJson("/api/model-badges?agentId=" + encodeURIComponent(agentId));
+          return [agentId, data];
+        })
+      );
+
+      setCliModelBadges(Object.fromEntries(results));
+    } catch (err) {
+      setError(err.message || String(err));
+    }
+  }
+
+  async function startCliAgentLogin(agentId) {
+    const id = String(agentId || "").trim();
+
+    if (!id) return;
+
+    setStartingCliAgent(id);
+    setError("");
+    setMessage("");
+
+    try {
+      const data = await fetchJson("/api/cli/auth/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ agentId: id })
+      });
+
+      setMessage((data.label || id) + " 로그인 터미널을 열었습니다.");
+      setTimeout(() => {
+        loadAll();
+      }, 2500);
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setStartingCliAgent("");
+    }
+  }
+
   async function startOAuthAuth(providerId) {
     const id = String(providerId || "").trim();
 
@@ -297,6 +436,7 @@ ${key}`);
 
   useEffect(() => {
     loadAll();
+    loadCliModelBadges();
   }, []);
 
   const envItems = useMemo(() => {
@@ -343,6 +483,36 @@ ${key}`);
       return id === "openai-codex";
     });
   }, [oauthItems]);
+
+  const cliAgentCards = [
+    {
+      id: "claude-code",
+      title: "Claude Code CLI Agent",
+      description: claudeStatus?.connected ? `Connected · ${claudeStatus.version || "-"}` : claudeStatus?.installed ? `Installed · ${claudeStatus.version || "-"}` : "Not installed in Mamabot runtime/cli",
+      configPath: claudeStatus?.claudeConfigWin || "F:\\mamabot\\runtime\\claude-home\\.claude",
+      connected: Boolean(claudeStatus?.connected),
+      installed: Boolean(claudeStatus?.installed),
+      statusLabel: claudeStatus?.connected ? "CONNECTED" : claudeStatus?.installed ? "INSTALLED" : "MISSING"
+    },
+    {
+      id: "codex-cli",
+      title: "Codex CLI Agent",
+      description: "ChatGPT OAuth / Codex CLI 인증형 에이전트",
+      configPath: "F:\\mamabot\\runtime\\codex-home",
+      connected: false,
+      installed: true,
+      statusLabel: "AUTH CHECK"
+    },
+    {
+      id: "gemini-cli",
+      title: "Gemini CLI Agent",
+      description: "Google Login / Gemini CLI 인증형 에이전트",
+      configPath: "F:\\mamabot\\runtime\\gemini-home",
+      connected: false,
+      installed: true,
+      statusLabel: "AUTH CHECK"
+    }
+  ];
 
   return (
     <section
@@ -653,183 +823,211 @@ ${key}`);
             borderBottom: "1px solid #e5e7eb",
             fontWeight: 900
           }}
-        >
-          OAuth Providers
-        </div>
+        >CLI 인증 에이전트</div>
 
-        <div style={{ padding: 14 }}>
-          {oauthProviders?.error ? (
-            <div style={{ color: "#991b1b", fontSize: 13 }}>{oauthProviders.error}</div>
-          ) : filteredOauthItems.length === 0 ? (
-            <div style={{ color: "#6b7280" }}>No OAuth providers found.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              {filteredOauthItems.map((provider, index) => {
-                const id = provider.id || provider.provider || provider.name || String(index);
-                const connected =
-                  provider.status?.logged_in ??
-                  provider.status?.connected ??
-                  provider.connected ??
-                  provider.enabled ??
-                  provider.authenticated ??
-                  false;
+        <div style={{ padding: 14, display: "grid", gap: 12 }}>
+          {cliAgentCards.map((agent) => {
+            const modelData = cliModelBadges[agent.id] || {};
+            const models = Array.isArray(modelData.models) ? modelData.models : [];
+            const latest = modelData.latest || models[0] || null;
+            const statusTone = agent.connected ? "good" : agent.installed ? "warn" : "bad";
 
-                return (
-                  <div
-                    key={id}
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 14,
-                      padding: 13,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      alignItems: "center"
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 900 }}>{id}</div>
-                      <div style={{ color: "#6b7280", fontSize: 12 }}>
-                        {safeString(provider.description || provider.label || provider.type)}
-                      </div>
+            return (
+              <div
+                key={agent.id}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 14,
+                  padding: 13,
+                  display: "grid",
+                  gap: 12
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    flexWrap: "wrap"
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 900 }}>{agent.title}</div>
+                      {latest ? (
+                        <Badge tone="good">
+                          최신: {latest.label || latest.id}
+                        </Badge>
+                      ) : null}
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          startOAuthAuth(id);
-                        }}
-                        disabled={authStarting === id}
-                        style={{
-                          border: "1px solid #2563eb",
-                          background: authStarting === id ? "#bfdbfe" : "#2563eb",
-                          color: "#ffffff",
-                          borderRadius: 10,
-                          padding: "7px 10px",
-                          fontSize: 12,
-                          fontWeight: 900,
-                          cursor: authStarting === id ? "wait" : "pointer"
-                        }}
-                      >
-                        {authStarting === id ? "\uC778\uC99D \uC911..." : "\uC778\uC99D \uC2DC\uC791"}
-                      </button>
+                    <div style={{ color: "#6b7280", fontSize: 12, lineHeight: 1.6, marginTop: 4 }}>
+                      {agent.description}
+                    </div>
 
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          loadAll();
-                        }}
-                        style={{
-                          border: "1px solid #d1d5db",
-                          background: "#ffffff",
-                          color: "#111827",
-                          borderRadius: 10,
-                          padding: "7px 10px",
-                          fontSize: 12,
-                          fontWeight: 900,
-                          cursor: "pointer"
-                        }}
-                      >
-                        {"\uC0C8\uB85C\uACE0\uCE68"}
-                      </button>
-
-                      <Badge tone={connected ? "good" : "warn"}>
-                        {connected ? "CONNECTED" : "NOT CONNECTED"}
-                      </Badge>
+                    <div style={{ color: "#6b7280", fontSize: 12, marginTop: 4, wordBreak: "break-all" }}>
+                      Config: {agent.configPath}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-      <div
-        style={{
-          marginTop: 16,
-          order: 3,
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          background: "#ffffff",
-          overflow: "hidden"
-        }}
-      >
-        <div
-          style={{
-            padding: 14,
-            borderBottom: "1px solid #e5e7eb",
-            fontWeight: 900
-          }}
-        >
-          CLI Agents
-        </div>
 
-        <div style={{ padding: 14 }}>
-          <div
-            style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: 14,
-              padding: 13,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              alignItems: "center"
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 900 }}>Claude Code CLI Agent</div>
-              <div style={{ color: "#6b7280", fontSize: 12, lineHeight: 1.6 }}>
-                {claudeStatus?.installed ? `Installed ? ${claudeStatus.version || "-"}` : "Not installed in Mamabot runtime/cli"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => startCliAgentLogin(agent.id)}
+                      disabled={startingCliAgent === agent.id}
+                      style={{
+                        border: "1px solid #2563eb",
+                        background: startingCliAgent === agent.id ? "#bfdbfe" : "#2563eb",
+                        color: "#ffffff",
+                        borderRadius: 10,
+                        padding: "7px 10px",
+                        fontSize: 12,
+                        fontWeight: 900,
+                        cursor: startingCliAgent === agent.id ? "wait" : "pointer"
+                      }}
+                    >
+                      {startingCliAgent === agent.id ? "Opening..." : "Login"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loadAll();
+                        loadCliModelBadges();
+                      }}
+                      style={{
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        color: "#111827",
+                        borderRadius: 10,
+                        padding: "7px 10px",
+                        fontSize: 12,
+                        fontWeight: 900,
+                        cursor: "pointer"
+                      }}
+                    >
+                      Refresh
+                    </button>
+
+                    <Badge tone={statusTone}>
+                      {agent.statusLabel}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    borderTop: "1px solid #f3f4f6",
+                    paddingTop: 10
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, fontSize: 13 }}>
+                      사용 가능 모델 · 최신순 · {models.length}개
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedCliAgents((prev) => ({
+                          ...prev,
+                          [agent.id]: !prev[agent.id]
+                        }))
+                      }
+                      style={{
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        color: "#111827",
+                        borderRadius: 999,
+                        padding: "4px 9px",
+                        fontSize: 11,
+                        fontWeight: 900,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {expandedCliAgents[agent.id] ? "접기" : "펼치기"}
+                    </button>
+                  </div>
+
+                  {models.length > 0 ? (
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 8,
+                        maxHeight: expandedCliAgents[agent.id] ? "none" : 68,
+                        overflow: "hidden"
+                      }}
+                    >
+                      {models.map((model) => (
+                        <div
+                          key={model.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "8px 10px",
+                            borderRadius: 10,
+                            background: "#f9fafb",
+                            border: "1px solid #eef2f7",
+                            flexWrap: "wrap"
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 850 }}>{model.label || model.id}</div>
+                            <div style={{ color: "#6b7280", fontSize: 12 }}>
+                              {model.id}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            {(model.badges || []).map((badge) => (
+                              <span
+                                key={badge}
+                                style={{
+                                  background:
+                                    badge === "최신" || badge === "추천"
+                                      ? "#dcfce7"
+                                      : badge === "구독" || badge === "CLI"
+                                        ? "#ede9fe"
+                                        : "#eff6ff",
+                                  color:
+                                    badge === "최신" || badge === "추천"
+                                      ? "#166534"
+                                      : badge === "구독" || badge === "CLI"
+                                        ? "#5b21b6"
+                                        : "#1e3a8a",
+                                  borderRadius: 999,
+                                  padding: "2px 7px",
+                                  fontSize: 11,
+                                  fontWeight: 900
+                                }}
+                              >
+                                {badge}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: "#6b7280", fontSize: 13 }}>
+                      모델 메타데이터가 아직 없습니다. Refresh를 눌러 다시 확인하세요.
+                    </div>
+                  )}
+                </div>
               </div>
-              <div style={{ color: "#6b7280", fontSize: 12, marginTop: 4, wordBreak: "break-all" }}>
-                Config: {claudeStatus?.claudeConfigWin || "F:\\mamabot\\runtime\\claude-home\\.claude"}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                type="button"
-                onClick={startClaudeCodeLogin}
-                disabled={startingClaudeCode || !claudeStatus?.installed}
-                style={{
-                  border: "1px solid #2563eb",
-                  background: startingClaudeCode ? "#bfdbfe" : "#2563eb",
-                  color: "#ffffff",
-                  borderRadius: 10,
-                  padding: "7px 10px",
-                  fontSize: 12,
-                  fontWeight: 900,
-                  cursor: startingClaudeCode ? "wait" : "pointer"
-                }}
-              >
-                {startingClaudeCode ? "Opening..." : "Login"}
-              </button>
-
-              <button
-                type="button"
-                onClick={loadAll}
-                style={{
-                  border: "1px solid #d1d5db",
-                  background: "#ffffff",
-                  color: "#111827",
-                  borderRadius: 10,
-                  padding: "7px 10px",
-                  fontSize: 12,
-                  fontWeight: 900,
-                  cursor: "pointer"
-                }}
-              >
-                Refresh
-              </button>
-
-              <Badge tone={claudeStatus?.connected ? "good" : claudeStatus?.installed ? "warn" : "bad"}>
-                {claudeStatus?.connected ? "CONNECTED" : claudeStatus?.installed ? "INSTALLED" : "MISSING"}
-              </Badge>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
 

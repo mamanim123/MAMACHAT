@@ -1,8 +1,0 @@
-{
-  "name": "mamabot-portable-cli-runtime",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "@anthropic-ai/claude-code": "^2.1.139"
-  }
-}
