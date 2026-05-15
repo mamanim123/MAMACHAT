@@ -50,10 +50,12 @@ function getAuthCliProviderLabel(provider = "") {
   return id || "Auth CLI Agent";
 }
 
-function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest" }) {
+function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest", executionProfile = "" }) {
   const providerId = String(provider || "").trim();
   const selectedModel = String(model || "").trim();
   const safePrompt = String(prompt || "").trim();
+  const profile = String(executionProfile || "").toLowerCase();
+  const useProjectWorkspace = profile !== "quick";
 
   if (providerId === "claude-code" || providerId === "claude_code") {
     const args = ["-p", safePrompt];
@@ -83,7 +85,7 @@ function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspace
     // Codex는 신뢰 디렉토리 체크를 반드시 우회해야 대시보드 workspace에서도 실행된다.
     args.push("--skip-git-repo-check");
 
-    if (workspaceRoot) {
+    if (workspaceRoot && useProjectWorkspace) {
       args.push("-C", workspaceRoot);
     }
 
@@ -123,7 +125,13 @@ function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspace
       args,
       homeDirName: "gemini-home",
       scrubKeys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-      extraEnv: {}
+      extraEnv: {
+        GEMINI_CLI_TRUST_WORKSPACE: "true"
+      },
+      cwdOverride:
+        String(executionProfile || "").toLowerCase() === "quick"
+          ? path.join(process.cwd(), "runtime", "gemini-chat-cwd")
+          : ""
     };
   }
 
@@ -139,32 +147,122 @@ function buildPowerShellCliInvocation(command = "", args = []) {
 }
 
 
-function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = "", executionProfile = "" }) {
+function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = "", executionProfile = "", provider = "" }) {
   const raw = String(prompt || "").trim();
   const style = String(responseMode || responseStyle || "").toLowerCase();
   const profile = String(executionProfile || "").toLowerCase();
+  const providerIdForPrompt = String(provider || "").toLowerCase();
 
-  const isQuick =
+  const isShort =
     style.includes("quick") ||
     style.includes("short") ||
+    style.includes("light") ||
     style.includes("짧") ||
     profile === "quick";
 
-  if (!isQuick) return raw;
+  const isNormal =
+    style.includes("normal") ||
+    style.includes("보통");
+
+  const isDetail =
+    style.includes("detail") ||
+    style.includes("long") ||
+    style.includes("자세") ||
+    style.includes("detailed");
+
+  const isCoding =
+    profile.includes("coding") ||
+    style.includes("coding") ||
+    style.includes("코딩");
+
+  const isReview =
+    profile.includes("review") ||
+    style.includes("review") ||
+    style.includes("검토");
+
+  const isAutomation =
+    profile.includes("automation") ||
+    style.includes("automation") ||
+    style.includes("자동화");
+
+  const isAgent =
+    profile.includes("agent") ||
+    style.includes("agent") ||
+    style.includes("분석");
+
+  let guide = "";
+
+  if (isShort) {
+    guide = [
+      "응답 스타일: Quick / 짧게.",
+      "사용자의 언어로 답하세요.",
+      "가능하면 1~2문장으로 직접 답하세요.",
+      "단순히 'Understood', '알겠습니다'만 말하지 말고 사용자 요청에 대한 실제 답을 주세요.",
+      "불필요한 설명, 서론, 반복 문구는 생략하세요."
+    ].join("\n");
+  } else if (isDetail) {
+    guide = [
+      "응답 스타일: 자세히.",
+      "사용자의 언어로 답하세요.",
+      "핵심 결론을 먼저 말한 뒤, 이유와 단계별 설명을 충분히 제공하세요.",
+      "필요하면 항목을 나누되, 불필요하게 장황하게 늘리지 마세요."
+    ].join("\n");
+  } else if (isCoding) {
+    guide = [
+      "응답 스타일: Coding / 코드작업.",
+      "사용자의 언어로 답하세요.",
+      "수정 전 원인 분석, 수정 대상 파일, 변경 방향, 검증 방법을 명확히 구분하세요.",
+      "파일을 직접 수정하라는 요청이 아니라면 명령어와 패치 계획 중심으로 답하세요.",
+      "위험한 명령은 피하고, 수정 전 백업을 우선 안내하세요."
+    ].join("\n");
+  } else if (isReview) {
+    guide = [
+      "응답 스타일: Review / 검토.",
+      "사용자의 언어로 답하세요.",
+      "장점보다 문제점, 리스크, 개선 우선순위를 중심으로 검토하세요.",
+      "수정이 필요한 부분은 구체적으로 짚어주세요."
+    ].join("\n");
+  } else if (isAutomation) {
+    guide = [
+      "응답 스타일: Automation / 자동화.",
+      "사용자의 언어로 답하세요.",
+      "반복 작업을 자동화할 수 있는 절차, 스크립트, 체크포인트 중심으로 답하세요.",
+      "실행 전 확인해야 할 위험 요소를 함께 말하세요."
+    ].join("\n");
+  } else if (isAgent) {
+    guide = [
+      "응답 스타일: Agent / 분석.",
+      "사용자의 언어로 답하세요.",
+      "현재 상태, 원인, 다음 작업 순서 중심으로 분석하세요.",
+      "작업에 바로 쓸 수 있는 명령어나 확인 절차를 우선 제시하세요."
+    ].join("\n");
+  } else if (isNormal) {
+    guide = [
+      "응답 스타일: 보통.",
+      "사용자의 언어로 자연스럽게 답하세요.",
+      "핵심 답변과 필요한 설명만 적당한 길이로 제공하세요."
+    ].join("\n");
+  } else {
+    guide = [
+      "응답 스타일: 기본.",
+      "사용자의 언어로 자연스럽게 답하세요.",
+      "요청에 직접 답하고 불필요한 서론은 줄이세요."
+    ].join("\n");
+  }
 
   return [
-    "Answer briefly.",
-    "Do not explain unless necessary.",
-    "For greetings or simple checks, reply in one short sentence.",
-    "User request:",
+    "[Mamabot response instruction - do not repeat]",
+    guide,
+    "",
+    "사용자 요청:",
     raw
   ].join("\n");
 }
 
-function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode }) {
+function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode, executionProfile }) {
   return new Promise((resolve) => {
     const root = process.cwd();
-    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode });
+    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode, executionProfile });
 
     if (!spec) {
       resolve({
@@ -180,6 +278,30 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
     const runtimeHome = path.join(root, "runtime", spec.homeDirName);
     fs.mkdirSync(runtimeHome, { recursive: true });
 
+    const isQuickAuthCli = String(executionProfile || "").toLowerCase() === "quick";
+    const authChatCwd = path.join(root, "runtime", "auth-chat-cwd", String(provider || "auth-cli"));
+    if (isQuickAuthCli) {
+      fs.mkdirSync(authChatCwd, { recursive: true });
+
+      // 일반 대화용 cwd에는 프로젝트 지시문/plan.md를 두지 않는다.
+      // CLI가 F:\mamabot의 plan.md, CLAUDE.md, GEMINI.md, AGENTS.md를 자동으로 읽는 것을 막는다.
+      const guardFiles = ["GEMINI.md", "CLAUDE.md", "AGENTS.md"];
+      for (const guard of guardFiles) {
+        const guardPath = path.join(authChatCwd, guard);
+        if (!fs.existsSync(guardPath)) {
+          fs.writeFileSync(
+            guardPath,
+            "General chat mode only. Do not inspect or mention project files, plan.md, CLAUDE.md, GEMINI.md, AGENTS.md, git commits, or workspace status unless the user explicitly asks.\n",
+            "utf8"
+          );
+        }
+      }
+    }
+
+    if (spec.cwdOverride) {
+      fs.mkdirSync(spec.cwdOverride, { recursive: true });
+    }
+
     const env = { ...process.env };
 
     // 인증형 CLI는 사용자가 이미 로그인한 공식 CLI credential store를 그대로 사용한다.
@@ -194,7 +316,9 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
     }
 
     for (const [key, value] of Object.entries(spec.extraEnv || {})) {
-      env[key] = path.isAbsolute(value) ? value : path.join(root, value);
+      // extraEnv는 환경변수 literal 값으로 넣는다.
+      // 예: GEMINI_CLI_TRUST_WORKSPACE="true"를 경로로 바꾸면 Gemini trust 처리가 실패한다.
+      env[key] = String(value);
     }
 
     // [PORTABLE CLI] runtime/cli/node_modules/.bin을 PATH 맨 앞에 강제 주입
@@ -215,8 +339,13 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
       if (fs.existsSync(binCandidate)) resolvedCommand = binCandidate;
     }
 
+    const spawnCwd = spec.cwdOverride || workspaceRoot || root;
+
     logLine(runId, `START auth-cli provider=${provider} model=${model || "-"} command=${resolvedCommand}`);
-    logLine(runId, `auth-cli cwd=${workspaceRoot || root}`);
+    logLine(runId, `auth-cli cwd=${spawnCwd}`);
+    if (spec.cwdOverride) {
+      logLine(runId, `auth-cli workspaceRoot=${workspaceRoot || "-"}`);
+    }
 
     let spawnCommand = resolvedCommand;
     let spawnArgs = spec.args;
@@ -240,7 +369,7 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
     logLine(runId, `SPAWN ${process.platform === "win32" ? "[win32 shell]" : "[posix]"} ${spawnCommand}`);
 
     const child = spawn(spawnCommand, spawnArgs, {
-      cwd: workspaceRoot || root,
+      cwd: spawnCwd,
       env,
       shell: spawnUseShell,
       windowsHide: true,
@@ -772,7 +901,8 @@ let workspaceWsl = "";
         prompt,
         responseMode,
         responseStyle: body.responseStyle || "",
-        executionProfile
+        executionProfile,
+        provider
       });
 
       const execution = await runAuthCliOneshot({
@@ -781,7 +911,8 @@ let workspaceWsl = "";
         model,
         prompt: authCliPrompt,
         workspaceRoot,
-        mode
+        mode,
+        executionProfile
       });
 
 

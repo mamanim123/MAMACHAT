@@ -1,103 +1,29 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-14",
+  "updatedAt": "2026-05-15T04:02:27.075Z",
   "policy": {
-    "freeModelBadges": [
-      "FREE",
-      "인기",
-      "최신",
-      "64K+",
-      "대용량",
-      "즐겨찾기"
-    ],
     "cliModelBadges": [
-      "최신",
+      "인증방식",
+      "CLI",
       "추천",
-      "안정",
+      "검증됨",
       "빠름",
-      "코딩",
-      "추론",
-      "구독",
-      "CLI"
+      "고성능",
+      "느림"
     ],
     "sortRules": {
-      "freeModels": [
-        "favorite desc",
-        "manualPopularityRank asc",
-        "created desc",
-        "contextLength desc",
-        "label asc"
-      ],
       "cliModels": [
         "releaseRank asc",
-        "recommended desc",
-        "stable desc",
         "label asc"
       ]
     }
   },
-  "openrouterFreePopularitySeeds": [
-    {
-      "id": "nvidia/nemotron-3-super-120b-a12b:free",
-      "rank": 1,
-      "badges": [
-        "FREE",
-        "인기 TOP",
-        "코딩",
-        "64K+",
-        "검증"
-      ]
-    },
-    {
-      "id": "deepseek/deepseek-v4-flash",
-      "rank": 2,
-      "badges": [
-        "FREE",
-        "인기",
-        "빠름"
-      ]
-    },
-    {
-      "id": "google/gemini-2.5-flash",
-      "rank": 3,
-      "badges": [
-        "FREE",
-        "인기",
-        "빠름",
-        "대용량"
-      ]
-    },
-    {
-      "id": "google/gemma-4-26b-a4b-it:free",
-      "rank": 4,
-      "badges": [
-        "FREE",
-        "오픈모델"
-      ]
-    },
-    {
-      "id": "openai/gpt-oss-120b:free",
-      "rank": 5,
-      "badges": [
-        "FREE",
-        "오픈모델",
-        "코딩"
-      ]
-    },
-    {
-      "id": "z-ai/glm-4.7-flash",
-      "rank": 6,
-      "badges": [
-        "FREE",
-        "빠름"
-      ]
-    }
-  ],
+  "openrouterFreePopularitySeeds": [],
   "cliAgents": [
     {
       "agentId": "claude-code",
       "label": "Claude Code",
-      "description": "인증방식 Claude Code CLI 실행",
+      "description": "인증방식 Claude Code CLI 실행 · 실제 실행 검증 완료",
       "models": [
         {
           "id": "claude-default",
@@ -105,26 +31,64 @@
           "badges": [
             "CLI",
             "인증방식",
-            "자동"
+            "자동",
+            "검증됨"
           ],
-          "note": "Claude Code 계정 기본 설정으로 실행"
+          "note": "Claude Code 계정 기본 설정으로 실행",
+          "releaseRank": 1,
+          "enabled": true,
+          "verified": true
         },
         {
-          "id": "claude-sonnet-4-5",
-          "label": "Claude Sonnet 4.5",
+          "id": "sonnet",
+          "label": "Claude Sonnet",
           "badges": [
             "CLI",
             "인증방식",
-            "코딩"
+            "추천",
+            "코딩",
+            "검증됨"
           ],
-          "note": "현재 동작 확인된 Claude Code 추천 모델"
+          "note": "Claude Code --model sonnet",
+          "releaseRank": 2,
+          "enabled": true,
+          "verified": true
+        },
+        {
+          "id": "opus",
+          "label": "Claude Opus",
+          "badges": [
+            "CLI",
+            "인증방식",
+            "추론",
+            "고성능",
+            "검증됨"
+          ],
+          "note": "Claude Code --model opus",
+          "releaseRank": 3,
+          "enabled": true,
+          "verified": true
+        },
+        {
+          "id": "haiku",
+          "label": "Claude Haiku",
+          "badges": [
+            "CLI",
+            "인증방식",
+            "빠름",
+            "검증됨"
+          ],
+          "note": "Claude Code --model haiku",
+          "releaseRank": 4,
+          "enabled": true,
+          "verified": true
         }
       ]
     },
     {
       "agentId": "codex-cli",
       "label": "Codex CLI",
-      "description": "인증방식 OpenAI Codex CLI 실행",
+      "description": "인증방식 OpenAI Codex CLI 실행 · 실제 실행 검증 완료",
       "models": [
         {
           "id": "codex-default",
@@ -132,36 +96,64 @@
           "badges": [
             "CLI",
             "인증방식",
-            "추천"
+            "자동",
+            "검증됨"
           ],
-          "note": "모델명을 비워서 ChatGPT 계정에 맞는 Codex 기본 모델로 실행"
+          "note": "모델명을 비워서 Codex 기본 모델로 실행",
+          "releaseRank": 1,
+          "enabled": true,
+          "verified": true
+        },
+        {
+          "id": "gpt-5.5",
+          "label": "GPT-5.5",
+          "badges": [
+            "CLI",
+            "인증방식",
+            "최신",
+            "추천",
+            "검증됨"
+          ],
+          "note": "Codex CLI -m gpt-5.5",
+          "releaseRank": 2,
+          "enabled": true,
+          "verified": true
+        },
+        {
+          "id": "gpt-5.4",
+          "label": "GPT-5.4",
+          "badges": [
+            "CLI",
+            "인증방식",
+            "안정",
+            "검증됨"
+          ],
+          "note": "Codex CLI -m gpt-5.4",
+          "releaseRank": 3,
+          "enabled": true,
+          "verified": true
         }
       ]
     },
     {
       "agentId": "gemini-cli",
       "label": "Gemini CLI",
-      "description": "인증방식 Google Gemini CLI 실행",
+      "description": "인증방식 Google Gemini CLI 실행 · 실제 실행 검증 완료",
       "models": [
-        {
-          "id": "gemini-default",
-          "label": "Gemini 기본 / 계정 자동",
-          "badges": [
-            "CLI",
-            "인증방식",
-            "자동"
-          ],
-          "note": "Gemini CLI 기본 설정으로 실행"
-        },
         {
           "id": "gemini-2.5-flash",
           "label": "Gemini 2.5 Flash",
           "badges": [
             "CLI",
             "인증방식",
-            "빠름"
+            "추천",
+            "빠름",
+            "검증됨"
           ],
-          "note": "Gemini CLI 빠른 응답용 모델"
+          "note": "명시 모델. 테스트 기준 약 15~20초. 기본 추천.",
+          "releaseRank": 1,
+          "enabled": true,
+          "verified": true
         },
         {
           "id": "gemini-2.5-pro",
@@ -169,9 +161,28 @@
           "badges": [
             "CLI",
             "인증방식",
-            "대용량"
+            "고성능",
+            "느림",
+            "검증됨"
           ],
-          "note": "Gemini CLI 고성능 모델"
+          "note": "명시 모델. 테스트 기준 약 149초. 긴 분석용.",
+          "releaseRank": 2,
+          "enabled": true,
+          "verified": true
+        },
+        {
+          "id": "gemini-default",
+          "label": "Gemini 기본 / 계정 자동",
+          "badges": [
+            "CLI",
+            "인증방식",
+            "자동",
+            "주의"
+          ],
+          "note": "내부 라우팅으로 느려질 수 있어 2.5 Flash 권장.",
+          "releaseRank": 3,
+          "enabled": true,
+          "verified": true
         }
       ]
     }

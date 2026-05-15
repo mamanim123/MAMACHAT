@@ -105,6 +105,34 @@ const fallbackAgentOptions = [
   }
 ];
 
+const CLI_MODEL_OPTIONS = {
+  "claude-code": [
+    { id: "", label: "Claude Code default", note: "Use the model selected by the logged-in Claude Code account." },
+    { id: "sonnet", label: "Claude Sonnet", note: "Claude Code Sonnet alias." },
+    { id: "opus", label: "Claude Opus", note: "Claude Code Opus alias." },
+    { id: "__custom__", label: "Custom Claude model", note: "Enter a Claude Code model manually." }
+  ],
+  "codex-cli": [
+    { id: "codex-default", label: "Codex account default", note: "Use the model selected by Codex/ChatGPT account." },
+    { id: "gpt-5.5", label: "GPT-5.5", note: "Codex CLI model override." },
+    { id: "__custom__", label: "Custom Codex model", note: "Enter a Codex model manually." }
+  ],
+  "gemini-cli": [
+    { id: "", label: "Gemini CLI default", note: "Use the model selected by Gemini CLI account." },
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", note: "Google Gemini CLI model override." },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", note: "Fast Google Gemini CLI model override." },
+    { id: "__custom__", label: "Custom Gemini model", note: "Enter a Gemini CLI model manually." }
+  ],
+  "opencode": [
+    { id: "", label: "OpenCode default", note: "Use OpenCode/OpenClaude default model." },
+    { id: "__custom__", label: "Custom OpenCode model", note: "Enter a model manually." }
+  ]
+};
+
+function getCliModelOptions(agentId) {
+  return CLI_MODEL_OPTIONS[String(agentId || "").trim()] || [];
+}
+
 const modeOptions = [
   { id: "suggest", label: "Suggest · 파일 수정 금지" },
   { id: "edit", label: "Edit · 일반 실행" },
@@ -340,6 +368,8 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
   }, [agentOptions, agentId]);
 
   const showApiModelPicker = Boolean(selectedAgent && selectedAgent.allowApiModelPicker);
+  const showCliModelPicker = Boolean(selectedAgent && selectedAgent.kind === "auth-cli");
+  const cliModelOptions = useMemo(() => getCliModelOptions(agentId), [agentId]);
   const showAuthCliNotice = selectedAgent && selectedAgent.kind === "auth-cli";
 
   const modelWarning = useMemo(() => {
@@ -490,7 +520,7 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
 
     const finalModel = model === "__custom__" ? customModel.trim() : model;
 
-    if (!dryRunValue && finalModel && !isHermesCompatible(finalModel)) {
+    if (!dryRunValue && showApiModelPicker && finalModel && !isHermesCompatible(finalModel)) {
       const warn = getModelWarning(finalModel) || "이 모델은 Hermes 호환성에 문제가 있을 수 있습니다.";
       const ok = window.confirm(`⚠ 경고
 
@@ -513,6 +543,7 @@ ${warn}
         },
         body: JSON.stringify({
           prompt: trimmed,
+          workspaceRoot: workspace,
           provider,
           mode,
           model: finalModel,
@@ -870,6 +901,42 @@ ${warn}
             </button>
           ) : null}
         </div>
+
+        {showCliModelPicker ? (
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 900, marginBottom: 7 }}>
+              CLI Model · subscription / OAuth / local account
+            </label>
+
+            <select
+              value={model}
+              onChange={(event) => handleModelChange(event.target.value)}
+              style={{
+                width: "100%",
+                border: "1px solid #d1d5db",
+                borderRadius: 10,
+                padding: "10px 11px",
+                background: "#ffffff"
+              }}
+            >
+              {cliModelOptions.map((item) => (
+                <option key={item.id || "default"} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            {cliModelOptions.find((item) => item.id === model)?.note ? (
+              <div style={{ marginTop: 7, fontSize: 12, color: "#4c1d95", lineHeight: 1.45 }}>
+                {cliModelOptions.find((item) => item.id === model)?.note}
+              </div>
+            ) : null}
+
+            <div style={{ marginTop: 7, fontSize: 12, color: "#6b21a8", lineHeight: 1.45 }}>
+              CLI Agent는 OpenRouter 모델 목록을 쓰지 않고, 로그인된 CLI 계정의 모델 또는 위 override 값을 사용합니다.
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {showApiModelPicker && selectedModelInfo ? (

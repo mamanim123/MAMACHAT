@@ -1,4 +1,4 @@
-# Mamabot Claude Code Guide
+# Mamabot Gemini CLI Guide
 
 # Mamabot Agent Router Guide
 
@@ -51,7 +51,7 @@ Long history belongs in .mamabot/WORKLOG.md.
 - Prefer suggest/plan mode before write mode.
 
 
-## Claude-specific notes
-- Keep this file concise.
-- Use .mamabot/PROJECT_INDEX.md as the map.
-- For occasional or large workflows, do not expand this file. Create separate docs or skills instead.
+## Gemini-specific notes
+- This file is for coding/agent work only.
+- For Quick Chat, Mamabot should run Gemini from a clean isolated cwd so project context is not loaded.
+- Use gemini-2.5-flash for normal quick coding checks unless the user chooses Pro.

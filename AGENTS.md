@@ -1,4 +1,4 @@
-# Mamabot Claude Code Guide
+# Mamabot Codex Agent Guide
 
 # Mamabot Agent Router Guide
 
@@ -51,7 +51,7 @@ Long history belongs in .mamabot/WORKLOG.md.
 - Prefer suggest/plan mode before write mode.
 
 
-## Claude-specific notes
-- Keep this file concise.
-- Use .mamabot/PROJECT_INDEX.md as the map.
-- For occasional or large workflows, do not expand this file. Create separate docs or skills instead.
+## Codex-specific notes
+- This file is the repo-level instruction file for Codex.
+- Keep it short and practical.
+- If subdirectory-specific rules are needed later, add smaller AGENTS.md files closer to that code.

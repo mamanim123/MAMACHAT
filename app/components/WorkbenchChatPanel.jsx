@@ -4,12 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import FolderPickerModal from "./FolderPickerModal.jsx";
 
 const providerOptions = [
-  { id: "hermes", label: "Hermes 기본 설정" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "openai", label: "OpenAI" },
-  { id: "anthropic", label: "Anthropic" },
-  { id: "gemini", label: "Gemini" }
+  { id: "hermes", label: "Hermes 기본 인증" },
+  { id: "claude-code", label: "Claude Code 로그인" },
+  { id: "codex-cli", label: "Codex 로그인" },
+  { id: "gemini-cli", label: "Gemini CLI 로그인" }
 ];
+
+function isDashboardAuthCliProvider(provider = "") {
+  return ["claude-code", "codex-cli", "gemini-cli", "opencode"].includes(String(provider || "").trim());
+}
 
 const modeOptions = [
   { id: "suggest", label: "Suggest · 파일 수정 금지" },
@@ -191,6 +194,19 @@ export default function WorkbenchChatPanel({
   const [provider, setProvider] = useState("hermes");
   const [mode, setMode] = useState("suggest");
   const [model, setModel] = useState("");
+
+  // AUTH_ONLY_PROVIDER_NORMALIZER
+  useEffect(() => {
+    const allowed = new Set(providerOptions.map((item) => item.id));
+    if (!allowed.has(provider)) {
+      setProvider("hermes");
+      setModel("");
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mamabot.selectedProvider", "hermes");
+        window.localStorage.setItem("mamabot.selectedModel", "");
+      }
+    }
+  }, [provider]);
   const [responseStyle, setResponseStyle] = useState("short");
   const [executionProfile, setExecutionProfile] = useState("quick");
   const [favorites, setFavorites] = useState([]);
@@ -284,6 +300,18 @@ export default function WorkbenchChatPanel({
       };
     });
   }, [favorites, liveModels]);
+
+  const isAuthCliProviderSelected = isDashboardAuthCliProvider(provider);
+
+  const selectedCliModelGroup = useMemo(() => {
+    if (!isAuthCliProviderSelected) return null;
+    return cliModelGroups.find((group) => group.agentId === provider) || null;
+  }, [cliModelGroups, provider, isAuthCliProviderSelected]);
+
+  const selectedProviderOption = useMemo(() => {
+    return providerOptions.find((item) => item.id === provider) || providerOptions[0];
+  }, [provider]);
+
 
   async function loadWorkspace() {
     setWorkspaceError("");
@@ -410,6 +438,22 @@ export default function WorkbenchChatPanel({
       setFavorites([]);
       setLiveModels([]);
     }
+  }
+
+  async function fetchRunRecord(runId) {
+    if (!runId) return null;
+
+    const res = await fetch("/api/agent/runs/" + encodeURIComponent(runId), {
+      cache: "no-store"
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.ok === false || !data.run) {
+      return null;
+    }
+
+    return data.run;
   }
 
   async function loadRun(runId) {
@@ -888,16 +932,44 @@ export default function WorkbenchChatPanel({
         return;
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: buildAssistantText(data),
-          createdAt: new Date().toISOString(),
-          runId: data.runId,
-          status: data.status || (dryRun ? "dryrun" : "success")
+      if (data.runId) {
+        const finalRun = await fetchRunRecord(data.runId);
+
+        if (finalRun) {
+          setMessages((prev) => [
+            ...prev.filter((msg) => msg.pendingRunId !== data.runId),
+            {
+              role: "assistant",
+              content: buildAssistantText(finalRun),
+              createdAt: finalRun.createdAt || new Date().toISOString(),
+              runId: finalRun.runId || data.runId,
+              status: finalRun.status || data.status || (dryRun ? "dryrun" : "success")
+            }
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: buildAssistantText(data),
+              createdAt: new Date().toISOString(),
+              runId: data.runId,
+              status: data.status || (dryRun ? "dryrun" : "success")
+            }
+          ]);
         }
-      ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: buildAssistantText(data),
+            createdAt: new Date().toISOString(),
+            runId: data.runId,
+            status: data.status || (dryRun ? "dryrun" : "success")
+          }
+        ]);
+      }
     } catch (err) {
       const message =
         err.name === "AbortError"
@@ -1042,7 +1114,48 @@ export default function WorkbenchChatPanel({
       <div style={{ display: "flex", alignItems: "center",
           flexWrap: "wrap", gap: 8, flexWrap: "wrap" }}>
         <select
+          value={provider}
+          title="인증방식"
+          aria-label="인증방식"
+          onChange={(event) => {
+            const nextProvider = event.target.value;
+            setProvider(nextProvider);
+            setModel("");
+
+            if (nextProvider === "openrouter") {
+              loadModels();
+            }
+
+            if (isDashboardAuthCliProvider(nextProvider)) {
+              loadCliModelGroups();
+            }
+          }}
+          style={{
+            width: 150,
+            minWidth: 130,
+            maxWidth: 170,
+            flex: "0 0 150px",
+            border: "1px solid #d1d5db",
+            background: "#ffffff",
+            color: "#111827",
+            borderRadius: 10,
+            padding: "8px 10px",
+            height: 36,
+            fontSize: 12,
+            fontWeight: 900,
+            cursor: "pointer"
+          }}
+        >
+          {providerOptions.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={model}
+          title="사용 모델"
           onChange={(event) => {
             const value = event.target.value;
             const parsedAuthModel = parseAuthCliModelValue(value);
@@ -1051,10 +1164,12 @@ export default function WorkbenchChatPanel({
 
             if (parsedAuthModel) {
               setProvider(parsedAuthModel.agentId);
-            } else if (value) {
+            } else if (isAuthCliProviderSelected) {
+              // 인증형 CLI 모델은 현재 선택된 인증방식을 유지한다.
+            } else if (value && provider === "openrouter") {
               setProvider("openrouter");
-            } else {
-              setProvider("hermes");
+            } else if (!value) {
+              setProvider(provider || "hermes");
             }
           }}
           style={{
@@ -1074,8 +1189,21 @@ export default function WorkbenchChatPanel({
             cursor: "pointer"
           }}
         >
-          <option value="">Hermes 기본 모델 사용</option>
-          {favoriteModels.length > 0 ? (
+          <option value="">
+            {isAuthCliProviderSelected
+              ? (selectedCliModelGroup?.label || selectedProviderOption?.label || "CLI") + " 기본 모델 사용"
+              : provider === "openrouter"
+                ? "OpenRouter 모델 선택"
+                : provider === "gemini"
+                  ? "Gemini API 기본 모델 사용"
+                  : provider === "openai"
+                    ? "OpenAI API 기본 모델 사용"
+                    : provider === "anthropic"
+                      ? "Anthropic API 기본 모델 사용"
+                      : "Hermes 기본 모델 사용"}
+          </option>
+
+          {provider === "openrouter" && favoriteModels.length > 0 ? (
             <optgroup label="즐겨찾기 모델">
               {favoriteModels.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -1084,28 +1212,24 @@ export default function WorkbenchChatPanel({
               ))}
             </optgroup>
           ) : null}
-          {cliModelGroups.length > 0 ? (
-            <>
-              {cliModelGroups.map((group) => (
-                <optgroup key={group.agentId} label={"인증방식 모델 · " + group.label}>
-                  {group.models.map((item) => (
-                    <option
-                      key={group.agentId + ":" + item.id}
-                      value={makeAuthCliModelValue(group.agentId, item.id)}
-                    >
-                      {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
-                    </option>
-                  ))}
-                </optgroup>
+
+          {isAuthCliProviderSelected && selectedCliModelGroup ? (
+            <optgroup label={selectedCliModelGroup.label + " 모델"}>
+              {selectedCliModelGroup.models.map((item) => (
+                <option key={selectedCliModelGroup.agentId + ":" + item.id} value={item.id}>
+                  {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
+                </option>
               ))}
-            </>
+            </optgroup>
           ) : null}
 
-          {liveModels.slice(0, 200).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name || item.id}
-            </option>
-          ))}
+          {provider === "openrouter"
+            ? liveModels.slice(0, 200).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name || item.id}
+                </option>
+              ))
+            : null}
         </select>
 
         <input
@@ -1306,7 +1430,10 @@ export default function WorkbenchChatPanel({
 
         <button
           type="button"
-          onClick={loadModels}
+          onClick={() => {
+            loadModels();
+            loadCliModelGroups();
+          }}
           style={{
             border: "1px solid #d1d5db",
             background: "#f9fafb",
