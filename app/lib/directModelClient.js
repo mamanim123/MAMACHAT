@@ -1,4 +1,4 @@
-﻿import { getProviderEnvKey, getSecretValue } from "./portableEnv.js";
+import { getProviderEnvKey, getSecretValue } from "./portableEnv.js";
 
 function normalizeOpenRouterModel(model) {
   const value = String(model || "").trim();
@@ -221,7 +221,7 @@ function buildSys(responseMode) {
 // ?? Google Gemini ?? ????????????????????????????????????????????????
 async function _geminiDirect({ prompt, model, responseMode, maxTokens }) {
   const key = getDirectKey("google");
-  if (!key) return null;
+  if (!key) throw new Error("GEMINI_API_KEY or GOOGLE_API_KEY missing");
   const mid = String(model || "").replace("google/", "") || "gemma-4-31b-it";
   const url = "https://generativelanguage.googleapis.com/v1beta/models/" + mid
             + ":generateContent?key=" + key;
@@ -244,7 +244,7 @@ async function _geminiDirect({ prompt, model, responseMode, maxTokens }) {
 // ?? Anthropic ?? ????????????????????????????????????????????????????
 async function _anthropicDirect({ prompt, model, responseMode, maxTokens }) {
   const key = getDirectKey("anthropic");
-  if (!key) return null;
+  if (!key) throw new Error("ANTHROPIC_API_KEY missing");
   const mid = String(model || "").replace("anthropic/", "") || "claude-sonnet-4-6";
   const t = Date.now();
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -262,9 +262,43 @@ async function _anthropicDirect({ prompt, model, responseMode, maxTokens }) {
 }
 
 // ?? DeepSeek ?? ?????????????????????????????????????????????????????
+async function _openAiDirect({ prompt, model, responseMode, maxTokens }) {
+  const key = getDirectKey("openai");
+  if (!key) throw new Error("OPENAI_API_KEY missing");
+  const mid = String(model || "").replace("openai/", "") || "gpt-4.1";
+  const t = Date.now();
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: mid,
+      temperature: 0.4,
+      max_tokens: maxTokens || 1024,
+      messages: [
+        { role: "system", content: buildSys(responseMode) },
+        { role: "user", content: String(prompt || "").trim() }
+      ]
+    })
+  });
+
+  const txt = await res.text();
+  let j = null; try { j = JSON.parse(txt); } catch {}
+  if (!res.ok) throw new Error("OpenAI direct " + res.status + ": " + (j?.error?.message || txt.slice(0,200)));
+
+  return {
+    output: j?.choices?.[0]?.message?.content || "",
+    raw: j,
+    usage: j?.usage || null,
+    model: j?.model || mid,
+    durationMs: Date.now() - t,
+    engine: "openai-direct"
+  };
+}
+
 async function _deepseekDirect({ prompt, model, responseMode, maxTokens }) {
   const key = getDirectKey("deepseek");
-  if (!key) return null;
+  if (!key) throw new Error("DEEPSEEK_API_KEY missing");
   const mid = String(model || "").replace("deepseek/", "") || "deepseek-chat";
   const t = Date.now();
   const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
@@ -320,36 +354,40 @@ async function _openRouterCall({ prompt, model, provider, responseMode, maxToken
 
 // ?? ?? ???: provider ?? ????????????????????????????????????????
 export async function runDirect({ prompt, model, provider = "openrouter", responseMode = "short", maxTokens = 512, webSearch = false }) {
-  const p = String(provider || "openrouter").toLowerCase().trim();
+  const p = String(provider || "openrouter").toLowerCase().trim().replace(/_/g, "-");
 
-  if (p === "google" || p === "gemini") {
-    const d = await _geminiDirect({ prompt, model, responseMode, maxTokens }).catch(() => null);
-    if (d) return { ...d, providerUsed: "google-direct" };
-    const r = await _openRouterCall({ prompt, model: normalizeModelForProvider("google", model), provider: "google", responseMode, maxTokens, webSearch });
-    return { ...r, providerUsed: "openrouter-via-google" };
+  if (p === "openrouter" || p === "hermes") {
+    const r = await _openRouterCall({
+      prompt,
+      model: model || "nvidia/nemotron-3-super-120b-a12b:free",
+      provider: "openrouter",
+      responseMode,
+      maxTokens,
+      webSearch
+    });
+    return { ...r, providerUsed: "openrouter" };
   }
 
-  if (p === "anthropic") {
-    const d = await _anthropicDirect({ prompt, model, responseMode, maxTokens }).catch(() => null);
-    if (d) return { ...d, providerUsed: "anthropic-direct" };
-    const r = await _openRouterCall({ prompt, model: normalizeModelForProvider("anthropic", model), provider: "anthropic", responseMode, maxTokens });
-    return { ...r, providerUsed: "openrouter-via-anthropic" };
+  if (p === "google" || p === "gemini" || p === "gemini-api") {
+    const d = await _geminiDirect({ prompt, model, responseMode, maxTokens });
+    return { ...d, providerUsed: "gemini-direct" };
   }
 
-  if (p === "deepseek") {
-    const d = await _deepseekDirect({ prompt, model, responseMode, maxTokens }).catch(() => null);
-    if (d) return { ...d, providerUsed: "deepseek-direct" };
-    const r = await _openRouterCall({ prompt, model: normalizeModelForProvider("deepseek", model), provider: "deepseek", responseMode, maxTokens });
-    return { ...r, providerUsed: "openrouter-via-deepseek" };
+  if (p === "anthropic" || p === "anthropic-api") {
+    const d = await _anthropicDirect({ prompt, model, responseMode, maxTokens });
+    return { ...d, providerUsed: "anthropic-direct" };
   }
 
-  if (["nvidia","meta","qwen","nous","openai"].includes(p)) {
-    const r = await _openRouterCall({ prompt, model: normalizeModelForProvider(p, model), provider: p, responseMode, maxTokens, webSearch });
-    return { ...r, providerUsed: "openrouter-via-" + p };
+  if (p === "openai" || p === "openai-api") {
+    const d = await _openAiDirect({ prompt, model, responseMode, maxTokens });
+    return { ...d, providerUsed: "openai-direct" };
   }
 
-  // openrouter / hermes / ?? ? ??? OpenRouter
-  const r = await _openRouterCall({ prompt, model: model || "nvidia/nemotron-3-super-120b-a12b:free", provider: p, responseMode, maxTokens, webSearch });
-  return { ...r, providerUsed: "openrouter" };
+  if (p === "deepseek" || p === "deepseek-api") {
+    const d = await _deepseekDirect({ prompt, model, responseMode, maxTokens });
+    return { ...d, providerUsed: "deepseek-direct" };
+  }
+
+  throw new Error("Direct provider is not supported without explicit adapter: " + p);
 }
 

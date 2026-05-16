@@ -1,4 +1,4 @@
-﻿export const runtime = "nodejs";
+export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import fs from "fs";
@@ -791,7 +791,7 @@ let workspaceWsl = "";
     contextPolicy = earlyResolvedProfile.contextPolicy;
     // AUTH_CLI_RUNNER_V1
     // Claude Code / Codex CLI / Gemini CLI??OpenRouter媛 ?꾨땲??媛?怨듭떇 CLI濡??ㅽ뻾?쒕떎.
-    if (isAuthCliProvider(provider) && executionProfile !== "quick") {
+    if (isAuthCliProvider(provider) && dryRun === false) {
       if (!prompt.trim()) {
         return NextResponse.json(
           { ok: false, error: "prompt is required", runId },
@@ -1308,7 +1308,7 @@ const portableRootWin = getPortableRoot();
         ok: true,
         dryRun: false,
         sessionId,
-        provider: provider || "openrouter",
+        provider: provider || "unknown",
         model,
         mode,
         skills: "",
@@ -1332,14 +1332,14 @@ const portableRootWin = getPortableRoot();
       });
 
       logLine(runId, "QUICK DIRECT execution accepted");
-      logLine(runId, "QUICK DIRECT execution accepted provider=" + (provider || "openrouter"));
+      logLine(runId, "QUICK DIRECT execution accepted provider=" + (provider || "unknown"));
 
       void (async () => {
         try {
           const direct = await runDirect({
             prompt,
-            model: model || "nvidia/nemotron-3-super-120b-a12b:free",
-            provider: provider || "openrouter",
+            model,
+            provider: provider || "unknown",
             responseMode
           });
 
@@ -1349,7 +1349,7 @@ const portableRootWin = getPortableRoot();
             status: "success",
             ok: true,
             dryRun: false,
-            provider: direct?.providerUsed || provider || "openrouter",
+            provider: direct?.providerUsed || provider || "unknown",
             model: direct.model || model,
             mode,
             skills: "",
@@ -1380,7 +1380,7 @@ const portableRootWin = getPortableRoot();
             status: "failed",
             ok: false,
             dryRun: false,
-            provider: provider || "openrouter",
+            provider: provider || "unknown",
             model,
             mode,
             skills: "",
@@ -1410,7 +1410,7 @@ const portableRootWin = getPortableRoot();
         ...plan,
         sessionId,
         status: "running",
-        provider: provider || "openrouter",
+        provider: provider || "unknown",
         engine: quickEngine,
         message: "Quick Mode direct execution started."
       });
