@@ -62,7 +62,7 @@ if (Test-Dashboard) {
   $dashboardPid = "$wslRoot/runtime/hermes/logs/dashboard-9119.pid"
 
   wsl bash -lc "mkdir -p '$wslRoot/runtime/hermes/logs'"
-  wsl bash -lc "cd '$wslRoot' && nohup bash scripts/start-hermes-dashboard-wsl.sh > '$dashboardLog' 2>&1 & echo \$! > '$dashboardPid'"
+  Start-Process -FilePath "wsl.exe" -ArgumentList @("bash", "-lc", "cd '$wslRoot' && bash scripts/start-hermes-dashboard-wsl.sh >> '$dashboardLog' 2>&1") -WindowStyle Minimized
 
   Write-Host "Dashboard 시작 대기 중..." -ForegroundColor Cyan
 
@@ -92,3 +92,4 @@ Write-Host "브라우저: http://localhost:3200" -ForegroundColor Green
 Write-Host ""
 
 npm run dev
+

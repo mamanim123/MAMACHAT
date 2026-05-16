@@ -1,4 +1,4 @@
-export const runtime = "nodejs";
+﻿export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import fs from "fs";
@@ -11,7 +11,7 @@ import {
 } from "../../../lib/workspaceManager.js";
 import { saveRun } from "../../../lib/runStore.js";
 import { syncMemoryToWorkspace } from "../../../lib/memorySync.js";
-import { runOpenRouterDirect } from "../../../lib/directModelClient.js";
+import { runDirect } from "../../../lib/directModelClient.js";
 import { searchWorkspaceIndex } from "../../../lib/workspaceIndex.js";
 import { compressCommandOutput } from "../../../lib/commandOutputCompressor.js";
 import { assessTokenBudget } from "../../../lib/tokenBudgetGuard.js";
@@ -50,12 +50,10 @@ function getAuthCliProviderLabel(provider = "") {
   return id || "Auth CLI Agent";
 }
 
-function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest", executionProfile = "" }) {
+function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest" }) {
   const providerId = String(provider || "").trim();
   const selectedModel = String(model || "").trim();
   const safePrompt = String(prompt || "").trim();
-  const profile = String(executionProfile || "").toLowerCase();
-  const useProjectWorkspace = profile !== "quick";
 
   if (providerId === "claude-code" || providerId === "claude_code") {
     const args = ["-p", safePrompt];
@@ -82,16 +80,16 @@ function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspace
   if (providerId === "codex-cli" || providerId === "codex") {
     const args = ["exec"];
 
-    // Codex는 신뢰 디렉토리 체크를 반드시 우회해야 대시보드 workspace에서도 실행된다.
+    // Codex???좊ː ?붾젆?좊━ 泥댄겕瑜?諛섎뱶???고쉶?댁빞 ??쒕낫??workspace?먯꽌???ㅽ뻾?쒕떎.
     args.push("--skip-git-repo-check");
 
-    if (workspaceRoot && useProjectWorkspace) {
+    if (workspaceRoot) {
       args.push("-C", workspaceRoot);
     }
 
     args.push("--sandbox", "read-only");
 
-    // codex-default는 모델명을 비워서 계정 자동 모델로 실행한다.
+    // codex-default??紐⑤뜽紐낆쓣 鍮꾩썙??怨꾩젙 ?먮룞 紐⑤뜽濡??ㅽ뻾?쒕떎.
     if (model && model !== "codex-default") {
       args.push("-m", model);
     }
@@ -125,13 +123,7 @@ function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspace
       args,
       homeDirName: "gemini-home",
       scrubKeys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-      extraEnv: {
-        GEMINI_CLI_TRUST_WORKSPACE: "true"
-      },
-      cwdOverride:
-        String(executionProfile || "").toLowerCase() === "quick"
-          ? path.join(process.cwd(), "runtime", "gemini-chat-cwd")
-          : ""
+      extraEnv: {}
     };
   }
 
@@ -147,122 +139,40 @@ function buildPowerShellCliInvocation(command = "", args = []) {
 }
 
 
-function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = "", executionProfile = "", provider = "" }) {
+function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = "", executionProfile = "" }) {
   const raw = String(prompt || "").trim();
-  const style = String(responseMode || responseStyle || "").toLowerCase();
-  const profile = String(executionProfile || "").toLowerCase();
-  const providerIdForPrompt = String(provider || "").toLowerCase();
+  const styleText = [responseMode, responseStyle, executionProfile]
+    .map((v) => String(v || "").toLowerCase())
+    .join(" ");
 
-  const isShort =
-    style.includes("quick") ||
-    style.includes("short") ||
-    style.includes("light") ||
-    style.includes("짧") ||
-    profile === "quick";
+  const isQuick =
+    styleText.includes("quick") ||
+    styleText.includes("short") ||
+    styleText.includes("light") ||
+    styleText.includes("brief") ||
+    styleText.includes("짧") ||
+    styleText.includes("간략") ||
+    styleText.includes("요약");
 
-  const isNormal =
-    style.includes("normal") ||
-    style.includes("보통");
-
-  const isDetail =
-    style.includes("detail") ||
-    style.includes("long") ||
-    style.includes("자세") ||
-    style.includes("detailed");
-
-  const isCoding =
-    profile.includes("coding") ||
-    style.includes("coding") ||
-    style.includes("코딩");
-
-  const isReview =
-    profile.includes("review") ||
-    style.includes("review") ||
-    style.includes("검토");
-
-  const isAutomation =
-    profile.includes("automation") ||
-    style.includes("automation") ||
-    style.includes("자동화");
-
-  const isAgent =
-    profile.includes("agent") ||
-    style.includes("agent") ||
-    style.includes("분석");
-
-  let guide = "";
-
-  if (isShort) {
-    guide = [
-      "응답 스타일: Quick / 짧게.",
-      "사용자의 언어로 답하세요.",
-      "가능하면 1~2문장으로 직접 답하세요.",
-      "단순히 'Understood', '알겠습니다'만 말하지 말고 사용자 요청에 대한 실제 답을 주세요.",
-      "불필요한 설명, 서론, 반복 문구는 생략하세요."
-    ].join("\n");
-  } else if (isDetail) {
-    guide = [
-      "응답 스타일: 자세히.",
-      "사용자의 언어로 답하세요.",
-      "핵심 결론을 먼저 말한 뒤, 이유와 단계별 설명을 충분히 제공하세요.",
-      "필요하면 항목을 나누되, 불필요하게 장황하게 늘리지 마세요."
-    ].join("\n");
-  } else if (isCoding) {
-    guide = [
-      "응답 스타일: Coding / 코드작업.",
-      "사용자의 언어로 답하세요.",
-      "수정 전 원인 분석, 수정 대상 파일, 변경 방향, 검증 방법을 명확히 구분하세요.",
-      "파일을 직접 수정하라는 요청이 아니라면 명령어와 패치 계획 중심으로 답하세요.",
-      "위험한 명령은 피하고, 수정 전 백업을 우선 안내하세요."
-    ].join("\n");
-  } else if (isReview) {
-    guide = [
-      "응답 스타일: Review / 검토.",
-      "사용자의 언어로 답하세요.",
-      "장점보다 문제점, 리스크, 개선 우선순위를 중심으로 검토하세요.",
-      "수정이 필요한 부분은 구체적으로 짚어주세요."
-    ].join("\n");
-  } else if (isAutomation) {
-    guide = [
-      "응답 스타일: Automation / 자동화.",
-      "사용자의 언어로 답하세요.",
-      "반복 작업을 자동화할 수 있는 절차, 스크립트, 체크포인트 중심으로 답하세요.",
-      "실행 전 확인해야 할 위험 요소를 함께 말하세요."
-    ].join("\n");
-  } else if (isAgent) {
-    guide = [
-      "응답 스타일: Agent / 분석.",
-      "사용자의 언어로 답하세요.",
-      "현재 상태, 원인, 다음 작업 순서 중심으로 분석하세요.",
-      "작업에 바로 쓸 수 있는 명령어나 확인 절차를 우선 제시하세요."
-    ].join("\n");
-  } else if (isNormal) {
-    guide = [
-      "응답 스타일: 보통.",
-      "사용자의 언어로 자연스럽게 답하세요.",
-      "핵심 답변과 필요한 설명만 적당한 길이로 제공하세요."
-    ].join("\n");
-  } else {
-    guide = [
-      "응답 스타일: 기본.",
-      "사용자의 언어로 자연스럽게 답하세요.",
-      "요청에 직접 답하고 불필요한 서론은 줄이세요."
-    ].join("\n");
-  }
+  if (!isQuick) return raw;
 
   return [
-    "[Mamabot response instruction - do not repeat]",
-    guide,
-    "",
-    "사용자 요청:",
+    "[Mamabot response rule - highest priority]",
+    "Reply in Korean unless the user asks for another language.",
+    "Do not introduce yourself.",
+    "Do not mention which CLI, model, provider, or agent you are.",
+    "Do not add a greeting unless the user explicitly asks for one.",
+    "Answer only the user's request.",
+    "Keep the answer very short: 1 sentence for simple chat, 3 bullets maximum for explanations.",
+    "User request:",
     raw
   ].join("\n");
 }
 
-function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode, executionProfile }) {
+function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode }) {
   return new Promise((resolve) => {
     const root = process.cwd();
-    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode, executionProfile });
+    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode });
 
     if (!spec) {
       resolve({
@@ -278,34 +188,10 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
     const runtimeHome = path.join(root, "runtime", spec.homeDirName);
     fs.mkdirSync(runtimeHome, { recursive: true });
 
-    const isQuickAuthCli = String(executionProfile || "").toLowerCase() === "quick";
-    const authChatCwd = path.join(root, "runtime", "auth-chat-cwd", String(provider || "auth-cli"));
-    if (isQuickAuthCli) {
-      fs.mkdirSync(authChatCwd, { recursive: true });
-
-      // 일반 대화용 cwd에는 프로젝트 지시문/plan.md를 두지 않는다.
-      // CLI가 F:\mamabot의 plan.md, CLAUDE.md, GEMINI.md, AGENTS.md를 자동으로 읽는 것을 막는다.
-      const guardFiles = ["GEMINI.md", "CLAUDE.md", "AGENTS.md"];
-      for (const guard of guardFiles) {
-        const guardPath = path.join(authChatCwd, guard);
-        if (!fs.existsSync(guardPath)) {
-          fs.writeFileSync(
-            guardPath,
-            "General chat mode only. Do not inspect or mention project files, plan.md, CLAUDE.md, GEMINI.md, AGENTS.md, git commits, or workspace status unless the user explicitly asks.\n",
-            "utf8"
-          );
-        }
-      }
-    }
-
-    if (spec.cwdOverride) {
-      fs.mkdirSync(spec.cwdOverride, { recursive: true });
-    }
-
     const env = { ...process.env };
 
-    // 인증형 CLI는 사용자가 이미 로그인한 공식 CLI credential store를 그대로 사용한다.
-    // HOME/USERPROFILE을 runtime 폴더로 바꾸면 Claude/Gemini/Codex 로그인이 풀리는 문제가 생긴다.
+    // ?몄쬆??CLI???ъ슜?먭? ?대? 濡쒓렇?명븳 怨듭떇 CLI credential store瑜?洹몃?濡??ъ슜?쒕떎.
+    // HOME/USERPROFILE??runtime ?대뜑濡?諛붽씀硫?Claude/Gemini/Codex 濡쒓렇?몄씠 ?由щ뒗 臾몄젣媛 ?앷릿??
     if (spec.usePortableHome === true) {
       env.HOME = runtimeHome;
       env.USERPROFILE = runtimeHome;
@@ -316,12 +202,10 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
     }
 
     for (const [key, value] of Object.entries(spec.extraEnv || {})) {
-      // extraEnv는 환경변수 literal 값으로 넣는다.
-      // 예: GEMINI_CLI_TRUST_WORKSPACE="true"를 경로로 바꾸면 Gemini trust 처리가 실패한다.
-      env[key] = String(value);
+      env[key] = path.isAbsolute(value) ? value : path.join(root, value);
     }
 
-    // [PORTABLE CLI] runtime/cli/node_modules/.bin을 PATH 맨 앞에 강제 주입
+    // [PORTABLE CLI] runtime/cli/node_modules/.bin??PATH 留??욎뿉 媛뺤젣 二쇱엯
     const portableBinDir = path.join(root, "runtime", "cli", "node_modules", ".bin");
     if (fs.existsSync(portableBinDir)) {
       const sep = process.platform === "win32" ? ";" : ":";
@@ -329,7 +213,7 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
       if (process.platform === "win32") env.Path = env.PATH;
     }
 
-    // [PORTABLE CLI] 절대경로로 CLI를 직접 잡는다 (전역 PATH 오염 무시)
+    // [PORTABLE CLI] ?덈?寃쎈줈濡?CLI瑜?吏곸젒 ?〓뒗??(?꾩뿭 PATH ?ㅼ뿼 臾댁떆)
     let resolvedCommand = spec.command;
     if (process.platform === "win32") {
       const cmdCandidate = path.join(portableBinDir, spec.command + ".cmd");
@@ -339,20 +223,15 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
       if (fs.existsSync(binCandidate)) resolvedCommand = binCandidate;
     }
 
-    const spawnCwd = spec.cwdOverride || workspaceRoot || root;
-
     logLine(runId, `START auth-cli provider=${provider} model=${model || "-"} command=${resolvedCommand}`);
-    logLine(runId, `auth-cli cwd=${spawnCwd}`);
-    if (spec.cwdOverride) {
-      logLine(runId, `auth-cli workspaceRoot=${workspaceRoot || "-"}`);
-    }
+    logLine(runId, `auth-cli cwd=${workspaceRoot || root}`);
 
     let spawnCommand = resolvedCommand;
     let spawnArgs = spec.args;
     let spawnUseShell = false;
 
     if (process.platform === "win32") {
-      // Node v18+ .cmd 보안 패치 회피: shell:true로 호출하되 인자를 안전하게 quoting.
+      // Node v18+ .cmd 蹂댁븞 ?⑥튂 ?뚰뵾: shell:true濡??몄텧?섎릺 ?몄옄瑜??덉쟾?섍쾶 quoting.
       const SAFE_ARG = /^[A-Za-z0-9_.\/:=\\-]+$/;
       const quoteArg = (a) => {
         const s = String(a == null ? "" : a);
@@ -369,7 +248,7 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
     logLine(runId, `SPAWN ${process.platform === "win32" ? "[win32 shell]" : "[posix]"} ${spawnCommand}`);
 
     const child = spawn(spawnCommand, spawnArgs, {
-      cwd: spawnCwd,
+      cwd: workspaceRoot || root,
       env,
       shell: spawnUseShell,
       windowsHide: true,
@@ -435,10 +314,10 @@ function cleanAuthCliOutput(stdout = "", stderr = "") {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    // Windows 작업 종료/프로세스 메시지, 깨진 문자 라인 제거
+    // Windows ?묒뾽 醫낅즺/?꾨줈?몄뒪 硫붿떆吏, 源⑥쭊 臾몄옄 ?쇱씤 ?쒓굅
     .filter((line) => !/PID\s+\d+/i.test(line))
-    .filter((line) => !line.includes("ï¿½"))
-    .filter((line) => !line.includes("�"));
+    .filter((line) => !line.includes("챦쩔쩍"))
+    .filter((line) => line.trim() !== "");
 
   if (outLines.length > 0) {
     return outLines[outLines.length - 1];
@@ -742,7 +621,7 @@ function resolveExecutionProfile({
   const hasTools = Boolean(String(toolsets || "").trim());
   const hasSkills = Boolean(String(skills || "").trim());
   const text = String(prompt || "")
-    .replace(/\[System instruction - do not repeat\][\s\S]*?사용자 요청:\s*/g, "")
+    .replace(/\[System instruction - do not repeat\][\s\S]*?User request:\s*/g, "")
     .trim();
 
   if (explicit) {
@@ -772,10 +651,29 @@ function resolveExecutionProfile({
   return { executionProfile: "agent", contextPolicy: "balanced" };
 }
 
+function needsRealtimeData(prompt = "") {
+  const text = String(prompt || "").toLowerCase();
+  return [
+    "오늘",
+    "현재",
+    "지금",
+    "최신",
+    "실시간",
+    "주가",
+    "시세",
+    "뉴스",
+    "환율",
+    "날씨",
+    "검색",
+    "조회",
+    "마감",
+    "장 마감"
+  ].some((word) => text.includes(word));
+}
 function shouldUseLightweightPrompt({ prompt = "", responseMode = "", skills = "", toolsets = "", executionProfile = "" }) {
   const text = String(prompt || "").trim();
   const plainText = text
-    .replace(/\[System instruction - do not repeat\][\s\S]*?사용자 요청:\s*/g, "")
+    .replace(/\[System instruction - do not repeat\][\s\S]*?User request:\s*/g, "")
     .trim();
 
   if (String(toolsets || "").trim()) return false;
@@ -785,7 +683,7 @@ function shouldUseLightweightPrompt({ prompt = "", responseMode = "", skills = "
   const shortMode = responseMode === "short" || responseMode === "light";
   const shortPrompt = plainText.length > 0 && plainText.length <= 120;
 
-  const simpleKorean = /^(안녕|안녕하세요|하이|hi|hello|오늘.*날씨|날씨|고마워|감사|ㅇㅋ|오케이)/i.test(plainText);
+  const simpleKorean = /^(hi|hello|hey|thanks?|thank you|ok|okay)$/i.test(plainText);
 
   return shortMode && (shortPrompt || simpleKorean);
 }
@@ -865,7 +763,7 @@ let workspaceWsl = "";
     sessionId = body.sessionId || "";
 
     // AUTH_CLI_WORKSPACE_EARLY_BIND
-    // auth-cli runner는 workspaceRoot 계산 전에 실행될 수 있으므로 body에서 먼저 묶는다.
+    // auth-cli runner??workspaceRoot 怨꾩궛 ?꾩뿉 ?ㅽ뻾?????덉쑝誘濡?body?먯꽌 癒쇱? 臾띕뒗??
     if (!workspaceRoot) {
       const earlyWorkspaceRoot =
         body.workspaceRoot ||
@@ -880,9 +778,20 @@ let workspaceWsl = "";
       }
     }
 
+    const earlyResolvedProfile = resolveExecutionProfile({
+      executionProfile,
+      responseMode,
+      prompt,
+      skills,
+      toolsets,
+      mode
+    });
+
+    executionProfile = earlyResolvedProfile.executionProfile;
+    contextPolicy = earlyResolvedProfile.contextPolicy;
     // AUTH_CLI_RUNNER_V1
-    // Claude Code / Codex CLI / Gemini CLI는 OpenRouter가 아니라 각 공식 CLI로 실행한다.
-    if (isAuthCliProvider(provider)) {
+    // Claude Code / Codex CLI / Gemini CLI??OpenRouter媛 ?꾨땲??媛?怨듭떇 CLI濡??ㅽ뻾?쒕떎.
+    if (isAuthCliProvider(provider) && executionProfile !== "quick") {
       if (!prompt.trim()) {
         return NextResponse.json(
           { ok: false, error: "prompt is required", runId },
@@ -901,8 +810,7 @@ let workspaceWsl = "";
         prompt,
         responseMode,
         responseStyle: body.responseStyle || "",
-        executionProfile,
-        provider
+        executionProfile
       });
 
       const execution = await runAuthCliOneshot({
@@ -911,13 +819,12 @@ let workspaceWsl = "";
         model,
         prompt: authCliPrompt,
         workspaceRoot,
-        mode,
-        executionProfile
+        mode
       });
 
 
       const stderrText = cleanAgentText(execution.stderr || "");
-      const output = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI 실행 결과가 비어 있습니다.";
+      const output = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI ?ㅽ뻾 寃곌낵媛 鍮꾩뼱 ?덉뒿?덈떎.";
       const stdoutText = output;
       const executionOk = Boolean(execution.ok && output.trim());
       const durationMs = Date.now() - startedAt;
@@ -972,7 +879,7 @@ let workspaceWsl = "";
           stderr: stderrText || "",
           compressedOutput,
           outputCompression,
-          error: executionOk ? "" : (stderrText || "Auth CLI 실행이 실패했습니다."),
+          error: executionOk ? "" : (stderrText || "Auth CLI ?ㅽ뻾???ㅽ뙣?덉뒿?덈떎."),
           exitCode: execution.exitCode,
           durationMs,
           usage: null,
@@ -998,7 +905,7 @@ let workspaceWsl = "";
         engine: "auth-cli",
         command: execution.command,
         output,
-        error: executionOk ? "" : (stderrText || "Auth CLI 실행이 실패했습니다."),
+        error: executionOk ? "" : (stderrText || "Auth CLI ?ㅽ뻾???ㅽ뙣?덉뒿?덈떎."),
         exitCode: execution.exitCode,
         durationMs,
         message: executionOk ? "Auth CLI execution finished." : "Auth CLI execution failed."
@@ -1036,9 +943,8 @@ let workspaceWsl = "";
     const hermesWorkspaceRoot = ensureHermesWorkspace(workspaceRoot);
     
 
-    // permissionGuard: 모드별 실행 허용 검사
-    // Quick 모드는 파일 수정/명령 실행이 아니라 Direct API 호출이므로
-    // suggest 권한에서도 read 성격으로 허용한다.
+    // permissionGuard: 紐⑤뱶蹂??ㅽ뻾 ?덉슜 寃??
+    // Quick 紐⑤뱶???뚯씪 ?섏젙/紐낅졊 ?ㅽ뻾???꾨땲??Direct API ?몄텧?대?濡?    // suggest 沅뚰븳?먯꽌??read ?깃꺽?쇰줈 ?덉슜?쒕떎.
     const permissionProfile = resolveExecutionProfile({
       executionProfile,
       responseMode,
@@ -1174,17 +1080,17 @@ const portableRootWin = getPortableRoot();
       allowHighTokenRisk !== true
     ) {
       const blockedMessage = [
-        "[토큰 예산 차단]",
+        "[?좏겙 ?덉궛 李⑤떒]",
         "",
-        "상태: " + (tokenBudget.severity === "danger" ? "위험" : "주의") + " (" + tokenBudget.severity + ")",
-        "예상 입력 토큰: " + tokenBudget.estimatedInputTokens,
-        "실용 제한: " + tokenBudget.practicalLimit,
-        "사용률: " + Math.round(Number(tokenBudget.ratio || 0) * 100) + "%",
+        "?곹깭: " + (tokenBudget.severity === "danger" ? "?꾪뿕" : "二쇱쓽") + " (" + tokenBudget.severity + ")",
+        "?덉긽 ?낅젰 ?좏겙: " + tokenBudget.estimatedInputTokens,
+        "?ㅼ슜 ?쒗븳: " + tokenBudget.practicalLimit,
+        "?ъ슜瑜? " + Math.round(Number(tokenBudget.ratio || 0) * 100) + "%",
         "",
-        "권장:",
-        "- 단순 질문이면 Quick 모드를 사용하세요.",
-        "- Agent/Coding 작업이면 세션 문맥이나 후보 파일 수를 줄이세요.",
-        "- 그래도 진행하려면 아래 버튼으로 확인 후 강제 실행하세요."
+        "沅뚯옣:",
+        "- ?⑥닚 吏덈Ц?대㈃ Quick 紐⑤뱶瑜??ъ슜?섏꽭??",
+        "- Agent/Coding ?묒뾽?대㈃ ?몄뀡 臾몃㎘?대굹 ?꾨낫 ?뚯씪 ?섎? 以꾩씠?몄슂.",
+        "- 洹몃옒??吏꾪뻾?섎젮硫??꾨옒 踰꾪듉?쇰줈 ?뺤씤 ??媛뺤젣 ?ㅽ뻾?섏꽭??"
       ].join("\n");
 
       logLine(runId, "tokenBudget " + tokenBudget.severity + " blocked estimatedInputTokens=" + tokenBudget.estimatedInputTokens);
@@ -1402,7 +1308,7 @@ const portableRootWin = getPortableRoot();
         ok: true,
         dryRun: false,
         sessionId,
-        provider: "openrouter",
+        provider: provider || "openrouter",
         model,
         mode,
         skills: "",
@@ -1426,13 +1332,14 @@ const portableRootWin = getPortableRoot();
       });
 
       logLine(runId, "QUICK DIRECT execution accepted");
-      logLine(runId, "engine=direct provider=openrouter skills=- toolsets=-");
+      logLine(runId, "QUICK DIRECT execution accepted provider=" + (provider || "openrouter"));
 
       void (async () => {
         try {
-          const direct = await runOpenRouterDirect({
+          const direct = await runDirect({
             prompt,
-            model,
+            model: model || "nvidia/nemotron-3-super-120b-a12b:free",
+            provider: provider || "openrouter",
             responseMode
           });
 
@@ -1442,7 +1349,7 @@ const portableRootWin = getPortableRoot();
             status: "success",
             ok: true,
             dryRun: false,
-            provider: "openrouter",
+            provider: direct?.providerUsed || provider || "openrouter",
             model: direct.model || model,
             mode,
             skills: "",
@@ -1473,7 +1380,7 @@ const portableRootWin = getPortableRoot();
             status: "failed",
             ok: false,
             dryRun: false,
-            provider: "openrouter",
+            provider: provider || "openrouter",
             model,
             mode,
             skills: "",
@@ -1503,7 +1410,7 @@ const portableRootWin = getPortableRoot();
         ...plan,
         sessionId,
         status: "running",
-        provider: "openrouter",
+        provider: provider || "openrouter",
         engine: quickEngine,
         message: "Quick Mode direct execution started."
       });
@@ -1536,7 +1443,7 @@ const portableRootWin = getPortableRoot();
           ok: false,
           runId,
           error:
-            "??Provider???꾩쭅 Hermes dry-run plan saved. No model call executed.",
+            "??Provider???袁⑹춦 Hermes dry-run plan saved. No model call executed.",
           logPath: getLogPath()
         },
         { status: 400 }
@@ -1623,7 +1530,7 @@ const portableRootWin = getPortableRoot();
           prompt,
           output: execution.stdout,
           stderr: execution.stderr,
-          error: executionOk ? "" : (logicalError || "Hermes 실행이 실패했습니다."),
+          error: executionOk ? "" : (logicalError || "Hermes ?ㅽ뻾???ㅽ뙣?덉뒿?덈떎."),
           exitCode: execution.code,
           durationMs: Date.now() - startedAt,
           logPath: execution.logPath || getLogPath()
@@ -1669,7 +1576,7 @@ const portableRootWin = getPortableRoot();
       status: "running",
       accepted: true,
       sessionId,
-      message: "백그라운드 실행을 시작했습니다."
+      message: "諛깃렇?쇱슫???ㅽ뻾???쒖옉?덉뒿?덈떎."
     });
   } catch (error) {
     logLine(runId, `ERROR ${error.message || String(error)}`);
@@ -1714,3 +1621,9 @@ const portableRootWin = getPortableRoot();
     );
   }
 }
+
+
+
+
+
+

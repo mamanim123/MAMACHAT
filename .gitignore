@@ -1,48 +1,51 @@
-﻿node_modules/
-.next/
-backups/
-backup/
-참고자료/
+# Mamabot portable source repository
 
-runtime/workspace-index/
-runtime/logs/
-runtime/hermes/logs/
-runtime/hermes/runs/
-runtime/hermes/home/hermes-agent/venv/
+# Dependencies
+/node_modules/
+**/node_modules/
 
-config/cache/
+# Next.js / build outputs
+/.next/
+/out/
+/dist/
+/build/
+/coverage/
 
+# Root runtime data kept in portable folder, but not tracked by Git
+/runtime/
+/backups/
+/logs/
+/runs/
+/workspaces/
+/.hermes-workspace/
+/.claude/
+/.auth/
+
+# Private local data
+/secrets/
+/memory/
+.env
+.env.*
+*.env
+
+# Local machine-specific config
+/config/workspace.json
+/config/*local*
+/portable.local.json
+
+# Temporary / backup files
 *.log
 *.tmp
 *.bak
 *.backup
 *.pid
 *.old
-*.pyc
 
-secrets/.env.local
-
-# Runtime secrets - 절대 GitHub에 올리지 않음
-runtime/gemini-home/.gemini/
-runtime/gemini-home/.gemini/oauth_creds.json
-
-runtime/hermes/home/.env
-runtime/hermes/home/auth.json
-runtime/hermes/home/.hermes/
-runtime/hermes/home/.hermes/auth.json
-runtime/hermes/home/.hermes/.env
-
-# Common auth files
-**/oauth_creds.json
-**/auth.json
-
-# Runtime local state - GitHub에 올리지 않음
-runtime/
-!runtime/.gitkeep
-
-# Local secret files
-**/auth.json
-**/oauth_creds.json
-**/.env
-**/.env.local
-secrets/.env.local
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# Local reference materials
+/참고자료/
+/config/cache/

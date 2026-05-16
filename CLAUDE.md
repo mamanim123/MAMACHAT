@@ -1,57 +1,25 @@
-# Mamabot Claude Code Guide
+﻿# Mamabot Claude Code Guide
 
-# Mamabot Agent Router Guide
+This is the local Claude Code guide for the Mamabot portable environment.
 
-This file is intentionally short because it may be loaded at the start of agent sessions.
+Use only files inside this Mamabot project unless the user explicitly asks otherwise.
 
-## Project role
-Mamabot is a portable personal agent dashboard for running Hermes Agent, Claude Code, Codex CLI, Gemini CLI, and verified model providers from one UI.
+## Local imports
 
-## First-read rule
-Do not scan the entire project first.
+@./.claude/COMMANDS.md
+@./.claude/FLAGS.md
+@./.claude/PRINCIPLES.md
+@./.claude/RULES.md
+@./.claude/MCP.md
+@./.claude/PERSONAS.md
+@./.claude/ORCHESTRATOR.md
+@./.claude/MODES.md
 
-Before reading source files, check:
+## Portable rules
 
-1. .mamabot/PROJECT_INDEX.md
-2. .mamabot/ACTIVE_PLAN.md
-3. .mamabot/CHECKLIST.md
-4. .mamabot/DECISIONS.md
-
-Use those files to locate the exact source files needed for the task.
-
-## Do not auto-read
-Do not read these unless the user explicitly asks:
-
-- .mamabot/WORKLOG.md
-- old plan history
-- backups/
-- runtime/hermes/runs/
-- runtime/hermes/logs/
-- node_modules/
-- .next/
-- large generated files
-
-## plan.md rule
-plan.md must stay short. It only contains the current goal and next steps.
-Long history belongs in .mamabot/WORKLOG.md.
-
-## Work method
-1. Identify the task type.
-2. Check .mamabot/PROJECT_INDEX.md for relevant files.
-3. Read only the smallest necessary file ranges.
-4. Before editing, create an external backup under F:\_mamabot_backups.
-5. Make the smallest safe change.
-6. Verify with targeted checks, not full-project scans.
-7. Summarize changed files and next checks.
-
-## Safety
+- Mamabot root: F:\mamabot
+- WSL root: /mnt/f/mamabot
+- Do not depend on F:\.claude for this project.
+- Prefer Mamabot-local runtime folders.
 - Do not modify user workspaces unless explicitly asked.
-- Do not run destructive commands.
-- Do not expose secrets or tokens.
-- Prefer suggest/plan mode before write mode.
-
-
-## Claude-specific notes
-- Keep this file concise.
-- Use .mamabot/PROJECT_INDEX.md as the map.
-- For occasional or large workflows, do not expand this file. Create separate docs or skills instead.
+- For code changes, prefer backup before patch.

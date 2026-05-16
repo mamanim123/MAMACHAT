@@ -4,15 +4,76 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import FolderPickerModal from "./FolderPickerModal.jsx";
 
 const providerOptions = [
-  { id: "hermes", label: "Hermes 기본 인증" },
-  { id: "claude-code", label: "Claude Code 로그인" },
-  { id: "codex-cli", label: "Codex 로그인" },
-  { id: "gemini-cli", label: "Gemini CLI 로그인" }
+  { id: "hermes",    label: "Hermes ?? ??" },
+  { id: "openrouter",label: "OpenRouter (?? ??)" },
+  { id: "nvidia",    label: "NVIDIA (??)" },
+  { id: "google",    label: "Google / Gemini" },
+  { id: "deepseek",  label: "DeepSeek" },
+  { id: "meta",      label: "Meta Llama (??)" },
+  { id: "qwen",      label: "Qwen (??)" },
+  { id: "anthropic", label: "Anthropic / Claude" },
+  { id: "openai",    label: "OpenAI" },
+  { id: "nous",      label: "Nous Research (??)" },
 ];
 
-function isDashboardAuthCliProvider(provider = "") {
-  return ["claude-code", "codex-cli", "gemini-cli", "opencode"].includes(String(provider || "").trim());
-}
+const FREE_MODELS_BY_PROVIDER = {
+  openrouter: [
+    { id: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super ✅검증" },
+    { id: "openrouter/owl-alpha",                   label: "Owl Alpha (1M ctx)" },
+    { id: "deepseek/deepseek-v4-flash:free",        label: "DeepSeek V4 Flash (1M)" },
+    { id: "openai/gpt-oss-120b:free",               label: "GPT-OSS 120B" },
+    { id: "openai/gpt-oss-20b:free",                label: "GPT-OSS 20B" },
+    { id: "qwen/qwen3-coder:free",                  label: "Qwen3 Coder (코딩)" },
+    { id: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B" },
+    { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 405B" },
+    { id: "arcee-ai/trinity-large-thinking:free",   label: "Arcee Trinity Thinking" },
+    { id: "inclusionai/ring-2.6-1t:free",           label: "Ring 2.6 1T (262K)" },
+  ],
+  nvidia: [
+    { id: "nvidia/nemotron-3-super-120b-a12b:free",          label: "Nemotron 3 Super ✅검증" },
+    { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", label: "Nemotron 3 Nano Omni" },
+    { id: "nvidia/nemotron-3-nano-30b-a3b:free",             label: "Nemotron 3 Nano 30B" },
+    { id: "nvidia/nemotron-nano-12b-v2-vl:free",             label: "Nemotron Nano 12B VL" },
+    { id: "nvidia/nemotron-nano-9b-v2:free",                 label: "Nemotron Nano 9B" },
+  ],
+  google: [
+    { id: "google/gemma-4-31b-it:free",             label: "Gemma 4 31B ★무료" },
+    { id: "google/gemma-4-26b-a4b-it:free",         label: "Gemma 4 26B MoE ★무료" },
+    { id: "google/gemini-2.5-flash",                label: "Gemini 2.5 Flash (유료)" },
+    { id: "google/gemini-2.5-pro",                  label: "Gemini 2.5 Pro (유료)" },
+  ],
+  deepseek: [
+    { id: "deepseek/deepseek-v4-flash:free",        label: "DeepSeek V4 Flash ★무료 1M" },
+    { id: "deepseek/deepseek-r1",                   label: "DeepSeek R1 (유료)" },
+  ],
+  meta: [
+    { id: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B ★무료" },
+    { id: "meta-llama/llama-3.2-3b-instruct:free",  label: "Llama 3.2 3B ★무료" },
+  ],
+  qwen: [
+    { id: "qwen/qwen3-coder:free",                  label: "Qwen3 Coder ★무료 코딩" },
+    { id: "qwen/qwen3-next-80b-a3b-instruct:free",  label: "Qwen3 Next 80B ★무료" },
+  ],
+  anthropic: [
+    { id: "anthropic/claude-sonnet-4.6",            label: "Claude Sonnet 4.6 (유료)" },
+    { id: "anthropic/claude-opus-4.6",              label: "Claude Opus 4.6 (유료)" },
+  ],
+  openai: [
+    { id: "openai/gpt-oss-120b:free",               label: "GPT-OSS 120B ★무료" },
+    { id: "openai/gpt-oss-20b:free",                label: "GPT-OSS 20B ★무료" },
+    { id: "openai/gpt-4.1",                         label: "GPT-4.1 (유료)" },
+  ],
+  nous: [
+    { id: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 405B ★무료" },
+  ],
+  hermes: [
+    { id: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super ✅기본 추천" },
+    { id: "openrouter/owl-alpha",                   label: "Owl Alpha" },
+    { id: "deepseek/deepseek-v4-flash:free",        label: "DeepSeek V4 Flash" },
+    { id: "openai/gpt-oss-120b:free",               label: "GPT-OSS 120B" },
+  ],
+};
+
 
 const modeOptions = [
   { id: "suggest", label: "Suggest · 파일 수정 금지" },
@@ -194,19 +255,6 @@ export default function WorkbenchChatPanel({
   const [provider, setProvider] = useState("hermes");
   const [mode, setMode] = useState("suggest");
   const [model, setModel] = useState("");
-
-  // AUTH_ONLY_PROVIDER_NORMALIZER
-  useEffect(() => {
-    const allowed = new Set(providerOptions.map((item) => item.id));
-    if (!allowed.has(provider)) {
-      setProvider("hermes");
-      setModel("");
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("mamabot.selectedProvider", "hermes");
-        window.localStorage.setItem("mamabot.selectedModel", "");
-      }
-    }
-  }, [provider]);
   const [responseStyle, setResponseStyle] = useState("short");
   const [executionProfile, setExecutionProfile] = useState("quick");
   const [favorites, setFavorites] = useState([]);
@@ -300,18 +348,6 @@ export default function WorkbenchChatPanel({
       };
     });
   }, [favorites, liveModels]);
-
-  const isAuthCliProviderSelected = isDashboardAuthCliProvider(provider);
-
-  const selectedCliModelGroup = useMemo(() => {
-    if (!isAuthCliProviderSelected) return null;
-    return cliModelGroups.find((group) => group.agentId === provider) || null;
-  }, [cliModelGroups, provider, isAuthCliProviderSelected]);
-
-  const selectedProviderOption = useMemo(() => {
-    return providerOptions.find((item) => item.id === provider) || providerOptions[0];
-  }, [provider]);
-
 
   async function loadWorkspace() {
     setWorkspaceError("");
@@ -438,22 +474,6 @@ export default function WorkbenchChatPanel({
       setFavorites([]);
       setLiveModels([]);
     }
-  }
-
-  async function fetchRunRecord(runId) {
-    if (!runId) return null;
-
-    const res = await fetch("/api/agent/runs/" + encodeURIComponent(runId), {
-      cache: "no-store"
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || data.ok === false || !data.run) {
-      return null;
-    }
-
-    return data.run;
   }
 
   async function loadRun(runId) {
@@ -932,44 +952,16 @@ export default function WorkbenchChatPanel({
         return;
       }
 
-      if (data.runId) {
-        const finalRun = await fetchRunRecord(data.runId);
-
-        if (finalRun) {
-          setMessages((prev) => [
-            ...prev.filter((msg) => msg.pendingRunId !== data.runId),
-            {
-              role: "assistant",
-              content: buildAssistantText(finalRun),
-              createdAt: finalRun.createdAt || new Date().toISOString(),
-              runId: finalRun.runId || data.runId,
-              status: finalRun.status || data.status || (dryRun ? "dryrun" : "success")
-            }
-          ]);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: buildAssistantText(data),
-              createdAt: new Date().toISOString(),
-              runId: data.runId,
-              status: data.status || (dryRun ? "dryrun" : "success")
-            }
-          ]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: buildAssistantText(data),
+          createdAt: new Date().toISOString(),
+          runId: data.runId,
+          status: data.status || (dryRun ? "dryrun" : "success")
         }
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: buildAssistantText(data),
-            createdAt: new Date().toISOString(),
-            runId: data.runId,
-            status: data.status || (dryRun ? "dryrun" : "success")
-          }
-        ]);
-      }
+      ]);
     } catch (err) {
       const message =
         err.name === "AbortError"
@@ -1114,48 +1106,7 @@ export default function WorkbenchChatPanel({
       <div style={{ display: "flex", alignItems: "center",
           flexWrap: "wrap", gap: 8, flexWrap: "wrap" }}>
         <select
-          value={provider}
-          title="인증방식"
-          aria-label="인증방식"
-          onChange={(event) => {
-            const nextProvider = event.target.value;
-            setProvider(nextProvider);
-            setModel("");
-
-            if (nextProvider === "openrouter") {
-              loadModels();
-            }
-
-            if (isDashboardAuthCliProvider(nextProvider)) {
-              loadCliModelGroups();
-            }
-          }}
-          style={{
-            width: 150,
-            minWidth: 130,
-            maxWidth: 170,
-            flex: "0 0 150px",
-            border: "1px solid #d1d5db",
-            background: "#ffffff",
-            color: "#111827",
-            borderRadius: 10,
-            padding: "8px 10px",
-            height: 36,
-            fontSize: 12,
-            fontWeight: 900,
-            cursor: "pointer"
-          }}
-        >
-          {providerOptions.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-
-        <select
           value={model}
-          title="사용 모델"
           onChange={(event) => {
             const value = event.target.value;
             const parsedAuthModel = parseAuthCliModelValue(value);
@@ -1164,13 +1115,8 @@ export default function WorkbenchChatPanel({
 
             if (parsedAuthModel) {
               setProvider(parsedAuthModel.agentId);
-            } else if (isAuthCliProviderSelected) {
-              // 인증형 CLI 모델은 현재 선택된 인증방식을 유지한다.
-            } else if (value && provider === "openrouter") {
-              setProvider("openrouter");
-            } else if (!value) {
-              setProvider(provider || "hermes");
             }
+            // provider ??? ???? ?? ?? (?? ???? ???)
           }}
           style={{
             width: 360,
@@ -1189,21 +1135,8 @@ export default function WorkbenchChatPanel({
             cursor: "pointer"
           }}
         >
-          <option value="">
-            {isAuthCliProviderSelected
-              ? (selectedCliModelGroup?.label || selectedProviderOption?.label || "CLI") + " 기본 모델 사용"
-              : provider === "openrouter"
-                ? "OpenRouter 모델 선택"
-                : provider === "gemini"
-                  ? "Gemini API 기본 모델 사용"
-                  : provider === "openai"
-                    ? "OpenAI API 기본 모델 사용"
-                    : provider === "anthropic"
-                      ? "Anthropic API 기본 모델 사용"
-                      : "Hermes 기본 모델 사용"}
-          </option>
-
-          {provider === "openrouter" && favoriteModels.length > 0 ? (
+          <option value="">Hermes 기본 모델 사용</option>
+          {favoriteModels.length > 0 ? (
             <optgroup label="즐겨찾기 모델">
               {favoriteModels.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -1212,24 +1145,35 @@ export default function WorkbenchChatPanel({
               ))}
             </optgroup>
           ) : null}
-
-          {isAuthCliProviderSelected && selectedCliModelGroup ? (
-            <optgroup label={selectedCliModelGroup.label + " 모델"}>
-              {selectedCliModelGroup.models.map((item) => (
-                <option key={selectedCliModelGroup.agentId + ":" + item.id} value={item.id}>
-                  {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
-                </option>
+          {cliModelGroups.length > 0 ? (
+            <>
+              {cliModelGroups.map((group) => (
+                <optgroup key={group.agentId} label={"인증방식 모델 · " + group.label}>
+                  {group.models.map((item) => (
+                    <option
+                      key={group.agentId + ":" + item.id}
+                      value={makeAuthCliModelValue(group.agentId, item.id)}
+                    >
+                      {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </optgroup>
+            </>
           ) : null}
 
-          {provider === "openrouter"
-            ? liveModels.slice(0, 200).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name || item.id}
-                </option>
-              ))
-            : null}
+          {(FREE_MODELS_BY_PROVIDER[provider] || []).length > 0 && (
+              <optgroup label={(providerOptions.find(p => p.id === provider) || {}).label || provider}>
+                {(FREE_MODELS_BY_PROVIDER[provider] || []).map(item => (
+                  <option key={"pf-" + item.id} value={item.id}>{item.label}</option>
+                ))}
+              </optgroup>
+            )}
+          {liveModels.slice(0, 200).map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name || item.id}
+            </option>
+          ))}
         </select>
 
         <input
@@ -1430,10 +1374,7 @@ export default function WorkbenchChatPanel({
 
         <button
           type="button"
-          onClick={() => {
-            loadModels();
-            loadCliModelGroups();
-          }}
+          onClick={loadModels}
           style={{
             border: "1px solid #d1d5db",
             background: "#f9fafb",
