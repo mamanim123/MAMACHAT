@@ -87,17 +87,29 @@ function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspace
     }
 
     const profile = String(executionProfile || "").trim();
-    const codexSandbox =
-      profile === "coding" || profile === "agent"
-        ? "workspace-write"
-        : "read-only";
+    const runMode = String(mode || "").trim();
+    const wantsWrite =
+      runMode !== "suggest" &&
+      (runMode === "edit" || runMode === "auto") &&
+      (profile === "coding" || profile === "agent" || profile === "automation");
+
+    const codexSandbox = wantsWrite ? "workspace-write" : "read-only";
 
     args.push("--sandbox", codexSandbox);
 
+    const codexReasoningEffort =
+      profile === "quick"
+        ? "low"
+        : profile === "review"
+          ? "medium"
+          : profile === "automation"
+            ? "medium"
+            : "high";
+
     // Codex 공식 config override.
     // CLI -c 값이 config.toml보다 우선한다.
-    args.push("-c", "model_reasoning_effort=\"high\"");
-if (selectedModel && selectedModel !== "codex-default") {
+    args.push("-c", `model_reasoning_effort="${codexReasoningEffort}"`);
+    if (selectedModel && selectedModel !== "codex-default") {
       args.push("-m", selectedModel);
     }
 
@@ -401,6 +413,34 @@ function cleanAgentText(value = "") {
     .replace(/\u001b\[[0-9;]*m/g, "")
     .replace(/\r\n/g, "\n")
     .trim();
+}
+
+function extractAuthCliTokenUsage(stdout = "", stderr = "") {
+  const text = cleanAgentText([stdout, stderr].filter(Boolean).join("\n"));
+  if (!text) return null;
+
+  const match = text.match(/(?:^|\n)\s*tokens\s+used\s*(?:\n|\r\n)\s*([\d,]+)/i);
+  if (!match) return null;
+
+  const rawTotal = String(match[1] || "").replace(/,/g, "");
+  const totalTokens = Number.parseInt(rawTotal, 10);
+
+  if (!Number.isFinite(totalTokens) || totalTokens <= 0) return null;
+
+  return {
+    total_tokens: totalTokens,
+    totalTokens,
+    source: "auth-cli",
+    label: totalTokens.toLocaleString("en-US") + " tokens"
+  };
+}
+
+function appendAuthCliTokenUsageFooter(output = "", tokenUsage = null) {
+  const text = String(output || "").trim();
+  if (!text || !tokenUsage?.totalTokens) return text;
+  if (/토큰\s*사용량\s*:/i.test(text)) return text;
+
+  return text + "\n\n---\n토큰 사용량: " + tokenUsage.label;
 }
 
 function maskPrompt(prompt) {
@@ -995,7 +1035,9 @@ let workspaceWsl = "";
           });
 
           const stderrText = cleanAgentText(execution.stderr || "");
-          const output = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI 실행 결과가 비어 있습니다.";
+          const authCliUsage = extractAuthCliTokenUsage(execution.stdout || "", execution.stderr || "");
+          const cleanOutput = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI 실행 결과가 비어 있습니다.";
+          const output = appendAuthCliTokenUsageFooter(cleanOutput, authCliUsage);
           const executionOk = Boolean(execution.ok && output.trim());
           const durationMs = Date.now() - startedAt;
           const status = executionOk ? "success" : "failed";
@@ -1051,7 +1093,7 @@ let workspaceWsl = "";
             error: executionOk ? "" : (stderrText || "Auth CLI 실행에 실패했습니다."),
             exitCode: execution.exitCode,
             durationMs,
-            usage: null,
+            usage: authCliUsage,
             tokenBudget: null,
             memorySync: null,
             workspaceCandidates: authCliWorkspaceCandidates,
@@ -1865,9 +1907,3 @@ const portableRootWin = getPortableRoot();
     );
   }
 }
-
-
-
-
-
-
