@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { getConfigRoot } from "../../../lib/portablePaths.js";
+import { enrichOpenRouterModel } from "../../../lib/modelBadges.js";
 
 const CACHE_TTL_MS = 1000 * 60 * 30;
 
@@ -55,15 +56,15 @@ function normalizeModel(model) {
     model.top_provider?.context_length ||
     0;
 
-  return {
+  return enrichOpenRouterModel({
     id: model.id,
     label: model.name || model.id,
     name: model.name || model.id,
     provider: "openrouter",
     source: "openrouter-live",
     note:
-      (model.id?.endsWith(":free") ? "??" : "OpenRouter") +
-      " ? context " +
+      (model.id?.endsWith(":free") ? "무료" : "OpenRouter") +
+      " · context " +
       Number(contextLength || 0).toLocaleString(),
     minContext: contextLength,
     contextLength,
@@ -78,7 +79,7 @@ function normalizeModel(model) {
         ? "Hermes ?? 64K context ?? ??"
         : "",
     created: model.created || null
-  };
+  });
 }
 
 export async function GET(request) {
@@ -138,6 +139,19 @@ export async function GET(request) {
         const af = a.tier === "free" ? 0 : 1;
         const bf = b.tier === "free" ? 0 : 1;
         if (af !== bf) return af - bf;
+
+        const ar = Number(a.manualPopularityRank || 9999);
+        const br = Number(b.manualPopularityRank || 9999);
+        if (ar !== br) return ar - br;
+
+        const ac = Number(a.created || 0);
+        const bc = Number(b.created || 0);
+        if (ac !== bc) return bc - ac;
+
+        const ax = Number(a.contextLength || 0);
+        const bx = Number(b.contextLength || 0);
+        if (ax !== bx) return bx - ax;
+
         return String(a.id).localeCompare(String(b.id));
       });
 

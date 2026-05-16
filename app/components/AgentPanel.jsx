@@ -124,11 +124,13 @@ function getSkillName(skill) {
 }
 
 function getModelBadges(item) {
-  const badges = [];
-  if (item.recommended) badges.push("⭐");
-  if (item.verified) badges.push("✓");
-  if (item.hermesCompatible === false) badges.push("⚠");
-  return badges.join("");
+  const badges = Array.isArray(item.badges) ? [...item.badges] : [];
+
+  if (item.recommended && !badges.includes("추천")) badges.push("추천");
+  if (item.verified && !badges.includes("검증")) badges.push("검증");
+  if (item.hermesCompatible === false && !badges.includes("주의")) badges.push("주의");
+
+  return badges.slice(0, 6).join(" · ");
 }
 
 const presetButtonStyle = {
