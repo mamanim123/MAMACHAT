@@ -337,11 +337,28 @@ export default function WorkbenchChatPanel({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [quickSessionId, setQuickSessionId] = useState("");
+
+  function notifySessionsRefresh(sessionId = "", select = false) {
+    if (typeof window === "undefined") return;
+
+    window.dispatchEvent(
+      new CustomEvent("mamabot:sessions-refresh", {
+        detail: {
+          sessionId: sessionId || activeSessionId || quickSessionId || "",
+          source: "quick-search",
+          select
+        }
+      })
+    );
+  }
   const [error, setError] = useState("");
   const [running, setRunning] = useState(false);
   const [runningLabel, setRunningLabel] = useState("");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsToast, setTtsToast] = useState(null);
+  const ttsAudioRef = useRef(null);
   const [tokenPreview, setTokenPreview] = useState(null);
   const [tokenPreviewLoading, setTokenPreviewLoading] = useState(false);
 
@@ -350,6 +367,201 @@ export default function WorkbenchChatPanel({
   const timelineRef = useRef(null);
   const lastLoadedSessionRef = useRef("");
   const pollingRunRef = useRef("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const saved = window.localStorage.getItem("mamabot.ttsEnabled");
+    setTtsEnabled(saved === "true");
+  }, []);
+
+  function showTtsToast(toast) {
+    const next = {
+      tone: toast?.tone || "info",
+      message: toast?.message || String(toast || "")
+    };
+
+    setTtsToast(next);
+
+    window.clearTimeout(window.__mamabotTtsToastTimer);
+    window.__mamabotTtsToastTimer = window.setTimeout(() => {
+      setTtsToast(null);
+    }, 3200);
+  }
+
+  function stopTtsPlayback() {
+    try {
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.currentTime = 0;
+        ttsAudioRef.current = null;
+      }
+
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {}
+
+    setSpeaking(false);
+  }
+
+  function toggleTtsEnabled() {
+    setTtsEnabled((prev) => {
+      const next = !prev;
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("mamabot.ttsEnabled", String(next));
+      }
+
+      if (!next) {
+        stopTtsPlayback();
+      }
+
+      showTtsToast({
+        tone: next ? "info" : "warning",
+        message: next ? "음성 사용 ON" : "음성 사용 OFF"
+      });
+
+      return next;
+    });
+  }
+
+  function getLatestAssistantTextForTts() {
+    const latest = [...messages]
+      .reverse()
+      .find((item) => item?.role === "assistant" && item?.content);
+
+    return String(latest?.content || "")
+      .replace(/[*_#>`]/g, " ")
+      .replace(/\[[^\]]+\]\([^\)]+\)/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 3000);
+  }
+
+async function copyAssistantMessage(content) {
+  const text = String(content || "").trim();
+
+  if (!text) {
+    showTtsToast({
+      tone: "warning",
+      message: "복사할 답변이 없습니다."
+    });
+    return;
+  }
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.focus();
+      area.select();
+      document.execCommand("copy");
+      document.body.removeChild(area);
+    }
+
+    showTtsToast({
+      tone: "info",
+      message: "답변을 복사했습니다."
+    });
+  } catch (error) {
+    showTtsToast({
+      tone: "danger",
+      message: "복사 실패: " + (error.message || String(error))
+    });
+  }
+}
+
+async function speakAssistantMessage(content) {
+  if (!ttsEnabled) {
+    showTtsToast({
+      tone: "warning",
+      message: "음성 사용이 꺼져 있습니다. 음성 ON으로 바꾼 뒤 다시 눌러주세요."
+    });
+    return;
+  }
+
+  if (speaking) {
+    stopTtsPlayback();
+    showTtsToast({
+      tone: "info",
+      message: "음성 재생을 중지했습니다."
+    });
+    return;
+  }
+
+  const text = String(content || "")
+    .replace(/[*_#>\`]/g, " ")
+    .replace(/\[[^\]]+\]\([^\)]+\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 3000);
+
+  if (!text) {
+    showTtsToast({
+      tone: "warning",
+      message: "읽어줄 답변이 없습니다."
+    });
+    return;
+  }
+
+  try {
+    setSpeaking(true);
+
+    const res = await fetch("/api/tts/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        languageCode: "ko-KR"
+      })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (data?.toast) {
+      showTtsToast(data.toast);
+    }
+
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || "Google TTS 호출 실패");
+    }
+
+    if (!data.audioContent) {
+      throw new Error("Google TTS 오디오가 비어 있습니다.");
+    }
+
+    const audio = new Audio("data:" + (data.mimeType || "audio/mpeg") + ";base64," + data.audioContent);
+    ttsAudioRef.current = audio;
+
+    audio.onended = () => {
+      setSpeaking(false);
+      ttsAudioRef.current = null;
+    };
+
+    audio.onerror = () => {
+      setSpeaking(false);
+      ttsAudioRef.current = null;
+      showTtsToast({
+        tone: "danger",
+        message: "음성 재생 중 오류가 발생했습니다."
+      });
+    };
+
+    await audio.play();
+  } catch (error) {
+    setSpeaking(false);
+    showTtsToast({
+      tone: "danger",
+      message: error.message || String(error)
+    });
+  }
+}
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1113,6 +1325,10 @@ export default function WorkbenchChatPanel({
 
       const data = await res.json();
 
+      if (data?.savedToSession && executionProfile === "quick") {
+        notifySessionsRefresh(data.sessionId || activeSessionId || quickSessionId || "", false);
+      }
+
       if (!res.ok || data.ok === false) {
         throw new Error(data.error || "에이전트 실행에 실패했습니다.");
       }
@@ -1260,37 +1476,87 @@ export default function WorkbenchChatPanel({
     recognition.start();
   }
 
-  function toggleSpeaker() {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      setError("이 브라우저는 음성 읽기를 지원하지 않습니다.");
-      return;
-    }
-
-    if (speaking) {
-      window.speechSynthesis.cancel();
-      setSpeaking(false);
-      return;
-    }
-
-    const latestAssistant = [...messages].reverse().find((item) => item.role === "assistant");
-    const text = (latestAssistant?.content || prompt || "").trim();
-
-    if (!text) {
-      setError("읽을 텍스트가 없습니다.");
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "ko-KR";
-    utterance.rate = 1;
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-
-    setSpeaking(true);
-    window.speechSynthesis.speak(utterance);
+  async function toggleSpeaker() {
+  if (!ttsEnabled) {
+    showTtsToast({
+      tone: "warning",
+      message: "음성 사용이 꺼져 있습니다. 음성 ON으로 바꾼 뒤 다시 눌러주세요."
+    });
+    return;
   }
+
+  if (speaking) {
+    stopTtsPlayback();
+    showTtsToast({
+      tone: "info",
+      message: "음성 재생을 중지했습니다."
+    });
+    return;
+  }
+
+  const text = getLatestAssistantTextForTts();
+
+  if (!text) {
+    showTtsToast({
+      tone: "warning",
+      message: "읽어줄 답변이 아직 없습니다."
+    });
+    return;
+  }
+
+  try {
+    setSpeaking(true);
+
+    const res = await fetch("/api/tts/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        languageCode: "ko-KR"
+      })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (data?.toast) {
+      showTtsToast(data.toast);
+    }
+
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || "Google TTS 호출 실패");
+    }
+
+    if (!data.audioContent) {
+      throw new Error("Google TTS 오디오가 비어 있습니다.");
+    }
+
+    const audio = new Audio("data:" + (data.mimeType || "audio/mpeg") + ";base64," + data.audioContent);
+    ttsAudioRef.current = audio;
+
+    audio.onended = () => {
+      setSpeaking(false);
+      ttsAudioRef.current = null;
+    };
+
+    audio.onerror = () => {
+      setSpeaking(false);
+      ttsAudioRef.current = null;
+      showTtsToast({
+        tone: "danger",
+        message: "음성 재생 중 오류가 발생했습니다."
+      });
+    };
+
+    await audio.play();
+  } catch (error) {
+    setSpeaking(false);
+
+    showTtsToast({
+      tone: "danger",
+      message: error.message || String(error)
+    });
+  }
+}
 
   return (
     <section
@@ -1728,9 +1994,62 @@ export default function WorkbenchChatPanel({
                   wordBreak: "break-word"
                 }}
               >
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, fontWeight: 900 }}>
-                  {isUser ? "나" : "에이전트"} {msg.status ? "· " + msg.status : ""} {msg.runId ? "· " + msg.runId : ""}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    marginBottom: 4
+                  }}
+                >
+                  <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
+                    {isUser ? "나" : "에이전트"} {msg.status ? "· " + msg.status : ""} {msg.runId ? "· " + msg.runId : ""}
+                  </div>
+
+                  {!isUser ? (
+                    <div style={{ display: "flex", gap: 6, flex: "0 0 auto" }}>
+                      <button
+                        type="button"
+                        onClick={() => copyAssistantMessage(msg.content)}
+                        title="답변 복사"
+                        style={{
+                          border: "1px solid #e5e7eb",
+                          background: "#f9fafb",
+                          color: "#374151",
+                          borderRadius: 999,
+                          width: 28,
+                          height: 24,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          cursor: "pointer"
+                        }}
+                      >
+                        ⧉
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => speakAssistantMessage(msg.content)}
+                        title="이 답변 읽어주기"
+                        style={{
+                          border: speaking ? "1px solid #dc2626" : "1px solid #e5e7eb",
+                          background: speaking ? "#fee2e2" : "#f9fafb",
+                          color: speaking ? "#991b1b" : "#374151",
+                          borderRadius: 999,
+                          width: 28,
+                          height: 24,
+                          fontSize: 12,
+                          fontWeight: 900,
+                          cursor: "pointer"
+                        }}
+                      >
+                        🔊
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
+
                 {msg.content}
 
                     {!isUser && msg.status === "blocked" && msg.retryPrompt ? (
@@ -1871,6 +2190,49 @@ export default function WorkbenchChatPanel({
         />
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-start", alignItems: "center" }}>
+          {ttsToast ? (
+            <div
+              style={{
+                position: "fixed",
+                right: 24,
+                bottom: 92,
+                zIndex: 300,
+                maxWidth: 420,
+                border: ttsToast.tone === "danger" ? "1px solid #fecaca" : ttsToast.tone === "warning" ? "1px solid #fde68a" : "1px solid #bfdbfe",
+                background: ttsToast.tone === "danger" ? "#fef2f2" : ttsToast.tone === "warning" ? "#fffbeb" : "#eff6ff",
+                color: ttsToast.tone === "danger" ? "#991b1b" : ttsToast.tone === "warning" ? "#92400e" : "#1e3a8a",
+                borderRadius: 14,
+                padding: "10px 12px",
+                fontSize: 12,
+                fontWeight: 900,
+                boxShadow: "0 12px 32px rgba(15,23,42,0.16)"
+              }}
+            >
+              {ttsToast.message}
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={toggleTtsEnabled}
+            title={ttsEnabled ? "음성 사용 끄기" : "음성 사용 켜기"}
+            style={{
+              border: ttsEnabled ? "1px solid #86efac" : "1px solid #d1d5db",
+              background: ttsEnabled ? "#dcfce7" : "#f9fafb",
+              color: ttsEnabled ? "#166534" : "#6b7280",
+              borderRadius: 999,
+              padding: "0 12px",
+              height: 38,
+              minWidth: 74,
+              flex: "0 0 auto",
+              fontSize: 12,
+              fontWeight: 900,
+              cursor: "pointer"
+            }}
+          >
+            {ttsEnabled ? "음성 ON" : "음성 OFF"}
+          </button>
+
           <button
             type="button"
             onClick={toggleSpeaker}

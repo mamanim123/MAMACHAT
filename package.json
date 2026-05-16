@@ -1,0 +1,22 @@
+{
+  "name": "mamabot-portable",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "runtime:check": "node scripts/portable/check-runtime.mjs",
+    "runtime:ensure": "node scripts/portable/ensure-runtime.mjs",
+    "runtime:install-cli": "node scripts/portable/install-cli.mjs",
+    "dev": "next dev -p 3200",
+    "build": "next build",
+    "start": "next start -p 3200",
+    "setup:office": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-office-hermes.ps1",
+    "setup:hermes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-office-hermes.ps1 -SkipNpmInstall",
+    "start:office": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-mamabot.ps1"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {}
+}

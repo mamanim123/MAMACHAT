@@ -1,0 +1,24 @@
+{
+"mode": "suggest",
+"allowFileRead": true,
+"allowFileWrite": false,
+"allowCommandRun": false,
+"requireApprovalForWrite": true,
+"requireApprovalForCommand": true,
+"blockedCommands": [
+"rm -rf",
+"del /s",
+"format",
+"git reset --hard",
+"git clean -fd",
+"Remove-Item -Recurse -Force"
+],
+"blockedFiles": [
+".env",
+".env.local",
+"credentials.json",
+"vault.json.enc",
+"id_rsa",
+"id_ed25519"
+]
+}

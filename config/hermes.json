@@ -1,0 +1,45 @@
+{
+  "mode": "portable_wsl",
+  "mainRuntime": "hermes",
+  "portableHermes": {
+    "enabled": true,
+    "root": "runtime/hermes",
+    "home": "runtime/hermes/home",
+    "installDir": "runtime/hermes/home/hermes-agent",
+    "logs": "runtime/hermes/logs"
+  },
+  "dashboard": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 9119,
+    "command": "hermes dashboard --no-open"
+  },
+  "gateway": {
+    "enabled": false,
+    "command": "hermes gateway"
+  },
+  "apiServer": {
+    "enabled": false,
+    "baseUrl": "http://127.0.0.1:8642/v1",
+    "apiKeyEnv": "HERMES_API_KEY"
+  },
+  "paths": {
+    "windowsWorkspaceRoot": "",
+    "wslWorkspaceRoot": "",
+    "memoryRoot": "memory",
+    "skillsRoot": "skills"
+  },
+  "features": {
+    "memory": true,
+    "soul": true,
+    "skills": true,
+    "cron": true,
+    "sessions": true,
+    "logs": true,
+    "analytics": true,
+    "gateway": true,
+    "obsidian": true,
+    "omi": false,
+    "swarms": true
+  }
+}

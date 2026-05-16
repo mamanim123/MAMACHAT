@@ -1,0 +1,6 @@
+{
+"theme": "dark",
+"defaultPanel": "agent",
+"showRuntimeStatus": true,
+"showWorkspaceStatus": true
+}
