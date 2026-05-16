@@ -50,6 +50,39 @@ function getAuthCliProviderLabel(provider = "") {
   return id || "Auth CLI Agent";
 }
 
+function buildSafetyPolicy({ provider = "", mode = "suggest", executionProfile = "", dryRun = true } = {}) {
+  const providerId = String(provider || "").trim();
+  const runMode = String(mode || "suggest").trim() || "suggest";
+  const profile = String(executionProfile || "agent").trim() || "agent";
+
+  const isCodexCli = providerId === "codex-cli" || providerId === "codex";
+  const isAuthCli = isAuthCliProvider(providerId);
+  const wantsWrite =
+    runMode !== "suggest" &&
+    (runMode === "edit" || runMode === "auto") &&
+    (profile === "coding" || profile === "agent" || profile === "automation");
+
+  const codexSandbox = isCodexCli ? (wantsWrite ? "workspace-write" : "read-only") : null;
+  const effectiveSandbox = codexSandbox || (wantsWrite ? "workspace-write" : "read-only");
+
+  return {
+    mode: runMode,
+    executionProfile: profile,
+    provider: providerId,
+    engine: isAuthCli ? "auth-cli" : profile === "quick" ? "direct" : "hermes",
+    dryRun: dryRun === true,
+    writeAllowed: wantsWrite,
+    requiresPreBackup: wantsWrite,
+    requiresPostCheck: wantsWrite,
+    dangerFullAccess: false,
+    sandbox: effectiveSandbox,
+    codexSandbox,
+    note: wantsWrite
+      ? "코드 수정은 workspace-write 샌드박스 안에서만 허용되며, 수정 전 외부 백업과 수정 후 검사가 필요합니다."
+      : "읽기/제안 중심 실행입니다. 파일 쓰기 권한은 허용되지 않습니다."
+  };
+}
+
 function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest", executionProfile = "" }) {
   const providerId = String(provider || "").trim();
   const selectedModel = String(model || "").trim();
@@ -836,6 +869,7 @@ export async function POST(request) {
   let sessionContextUsed = true;
   let workspaceCandidates = [];
   let tokenBudget = null;
+  let safetyPolicy = null;
   let allowHighTokenRisk = false;
   let workspaceRoot = "";
   
@@ -888,6 +922,7 @@ let workspaceWsl = "";
 
     executionProfile = earlyResolvedProfile.executionProfile;
     contextPolicy = earlyResolvedProfile.contextPolicy;
+    safetyPolicy = buildSafetyPolicy({ provider, mode, executionProfile, dryRun });
     // AUTH_CLI_RUNNER_V1
     // Claude Code / Codex CLI / Gemini CLI??OpenRouter媛 ?꾨땲??媛?怨듭떇 CLI濡??ㅽ뻾?쒕떎.
     if (isAuthCliProvider(provider) && dryRun === false) {
@@ -1001,6 +1036,7 @@ let workspaceWsl = "";
           durationMs: 0,
           usage: null,
           tokenBudget: null,
+            safetyPolicy,
           memorySync: null,
           workspaceCandidates: authCliWorkspaceCandidates,
           command: "auth-cli",
@@ -1095,6 +1131,7 @@ let workspaceWsl = "";
             durationMs,
             usage: authCliUsage,
             tokenBudget: null,
+            safetyPolicy,
             memorySync: null,
             workspaceCandidates: authCliWorkspaceCandidates,
             command: execution.command || "auth-cli",
@@ -1160,6 +1197,7 @@ let workspaceWsl = "";
               durationMs: Date.now() - startedAt,
               usage: null,
               tokenBudget: null,
+            safetyPolicy,
               memorySync: null,
               workspaceCandidates: authCliWorkspaceCandidates,
               command: "auth-cli",
@@ -1193,6 +1231,7 @@ let workspaceWsl = "";
         message: "Auth CLI background execution started.",
         executionProfile,
         contextPolicy,
+        safetyPolicy,
         workspaceCandidateCount: authCliWorkspaceCandidates.length,
         workspaceCandidates: authCliWorkspaceCandidates
       });
@@ -1263,6 +1302,7 @@ let workspaceWsl = "";
 
     executionProfile = resolvedProfile.executionProfile;
     contextPolicy = resolvedProfile.contextPolicy;
+    safetyPolicy = buildSafetyPolicy({ provider, mode, executionProfile, dryRun });
 
     if (executionProfile !== "quick") {
       try {
@@ -1549,6 +1589,10 @@ const portableRootWin = getPortableRoot();
     }
 
     if (dryRun) {
+      if (plan && plan.safetyPolicy == null) {
+        plan.safetyPolicy = safetyPolicy;
+      }
+
       logLine(runId, "DRY RUN complete");
 
       saveAndAttach({
@@ -1563,6 +1607,7 @@ const portableRootWin = getPortableRoot();
         skills,
         toolsets,
         tokenBudget,
+        safetyPolicy,
         memorySync,
         workspaceCandidates,
         workspaceRoot,
