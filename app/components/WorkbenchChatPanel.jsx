@@ -395,9 +395,13 @@ export default function WorkbenchChatPanel({
   }, [cliModelGroups, provider]);
 
   const providerPresetModels = useMemo(() => {
+    const hasLiveModels = liveModels.some((item) => modelMatchesProvider(item, provider));
+
+    if (hasLiveModels) return [];
+
     const group = normalizeProviderModelGroup(provider);
     return FREE_MODELS_BY_PROVIDER[group] || [];
-  }, [provider]);
+  }, [provider, liveModels]);
 
   const providerLiveModels = useMemo(() => {
     if (authCliSelected) return [];
@@ -520,11 +524,11 @@ export default function WorkbenchChatPanel({
     }
   }
 
-  async function loadModels() {
+  async function loadModels(refresh = false) {
     try {
       const [favRes, modelsRes] = await Promise.all([
         fetch("/api/models/favorites", { cache: "no-store" }),
-        fetch("/api/models/openrouter", { cache: "no-store" })
+        fetch(refresh ? "/api/models/openrouter?refresh=true" : "/api/models/openrouter", { cache: "no-store" })
       ]);
 
       const favJson = await favRes.json();
@@ -537,6 +541,18 @@ export default function WorkbenchChatPanel({
       setLiveModels([]);
     }
   }
+
+  useEffect(() => {
+    function handleModelsRefresh() {
+      loadModels(true);
+    }
+
+    window.addEventListener("mamabot:models-refresh", handleModelsRefresh);
+
+    return () => {
+      window.removeEventListener("mamabot:models-refresh", handleModelsRefresh);
+    };
+  }, []);
 
   async function loadRun(runId) {
     if (!runId) return;
