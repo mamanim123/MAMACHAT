@@ -261,6 +261,16 @@ export default function AgentPanel({ activeSessionId = "", onSessionChanged = nu
 
   useEffect(() => {
     loadLiveModels(false);
+
+    function handleModelsRefresh() {
+      loadLiveModels(true);
+    }
+
+    window.addEventListener("mamabot:models-refresh", handleModelsRefresh);
+
+    return () => {
+      window.removeEventListener("mamabot:models-refresh", handleModelsRefresh);
+    };
   }, []);
 
   const flatPresets = useMemo(() => flattenModelPresets(), []);
