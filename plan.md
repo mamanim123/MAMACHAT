@@ -5039,3 +5039,27 @@ Quick 실행 시 Claude Code / Codex CLI / Gemini CLI 같은 인증형 CLI Provi
 
 <!-- MAMABOT_ROUTING_FIX_20260516_END -->
 
+
+## 2026-05-16 13:23:17 작업 기록 - 인증형 CLI / Codex 실행 최적화
+
+### 완료한 작업
+- 인증형 CLI 실행 경로를 OpenRouter가 아닌 각 공식 CLI 실행 방식으로 분리했다.
+- Codex CLI는 codex exec 기반으로 실행되며, -C workspace, --sandbox, -m model, -c model_reasoning_effort 옵션을 사용하도록 정리했다.
+- Codex 프롬프트를 Windows 명령 인자가 아니라 stdin 방식으로 전달하도록 보정했다.
+- 인증형 CLI 실행 결과가 실행 이력뿐 아니라 대화창 세션에도 저장되도록 연결했다.
+- 인증형 CLI도 백그라운드 실행 구조로 전환하여, 실행 중 화면이 오래 붙잡히지 않도록 개선했다.
+- workspace index 후보를 auth-cli 경로에서도 사용하도록 연결했다.
+- AGENTS.md와 .mamabot/PROJECT_INDEX.md를 토큰 절약형 규칙으로 정리했다.
+- Codex가 불필요하게 CHECKLIST.md, DECISIONS.md, ACTIVE_PLAN.md, 전체 oute.js를 읽지 않도록 지침을 강화했다.
+
+### 검증 결과
+- Codex CLI Review 실행에서 workspace index 후보 8개가 전달되었다.
+- Codex가 pp/api/agent/run/route.js 관련 범위 중심으로 검토했다.
+- 이전 실행 대비 토큰 사용량이 약 71,626 → 17,109 수준으로 감소했다.
+- 실행 결과는 run history와 conversation session에 저장되는 것을 확인했다.
+
+### 남은 개선 과제
+- Codex 분기에서 mode === "suggest"가 sandbox/approval 정책에 더 명확히 반영되도록 개선한다.
+- model_reasoning_effort="high" 하드코딩을 Quick/Review/Coding/Agent 프로필별로 분리한다.
+- Windows shell:true 수동 quoting에서 -c model_reasoning_effort 전달이 더 안전하도록 개선한다.
+- Codex Quick은 일반 대화용보다 Review/Coding 중심으로 쓰도록 UI 안내를 보강한다.

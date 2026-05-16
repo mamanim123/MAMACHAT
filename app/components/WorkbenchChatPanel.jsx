@@ -4,17 +4,50 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import FolderPickerModal from "./FolderPickerModal.jsx";
 
 const providerOptions = [
-  { id: "hermes",    label: "Hermes ?? ??" },
-  { id: "openrouter",label: "OpenRouter (?? ??)" },
-  { id: "nvidia",    label: "NVIDIA (??)" },
-  { id: "google",    label: "Google / Gemini" },
-  { id: "deepseek",  label: "DeepSeek" },
-  { id: "meta",      label: "Meta Llama (??)" },
-  { id: "qwen",      label: "Qwen (??)" },
-  { id: "anthropic", label: "Anthropic / Claude" },
-  { id: "openai",    label: "OpenAI" },
-  { id: "nous",      label: "Nous Research (??)" },
+  { id: "hermes",        label: "Hermes Agent",       kind: "agent",    note: "Hermes 실행 / 에이전트 작업" },
+  { id: "claude-code",   label: "Claude Code CLI",    kind: "auth-cli", note: "구독/OAuth 기반 CLI" },
+  { id: "codex-cli",     label: "Codex CLI",          kind: "auth-cli", note: "ChatGPT OAuth 기반 CLI" },
+  { id: "gemini-cli",    label: "Gemini CLI",         kind: "auth-cli", note: "Google Login 기반 CLI" },
+  { id: "openrouter",    label: "OpenRouter API",     kind: "api",      note: "OpenRouter API Key" },
+  { id: "gemini-api",    label: "Gemini API",         kind: "api",      note: "GEMINI_API_KEY / GOOGLE_API_KEY" },
+  { id: "openai-api",    label: "OpenAI API",         kind: "api",      note: "OPENAI_API_KEY" },
+  { id: "anthropic-api", label: "Anthropic API",      kind: "api",      note: "ANTHROPIC_API_KEY" },
+  { id: "deepseek",      label: "DeepSeek API",       kind: "api",      note: "DEEPSEEK_API_KEY" }
 ];
+
+
+function isAuthCliProviderId(providerId = "") {
+  return ["claude-code", "codex-cli", "gemini-cli"].includes(String(providerId || "").trim());
+}
+
+function isDirectApiProviderId(providerId = "") {
+  return ["openrouter", "gemini-api", "openai-api", "anthropic-api", "deepseek"].includes(String(providerId || "").trim());
+}
+
+function normalizeProviderModelGroup(providerId = "") {
+  const id = String(providerId || "").trim();
+
+  if (id === "gemini-api") return "google";
+  if (id === "openai-api") return "openai";
+  if (id === "anthropic-api") return "anthropic";
+
+  return id;
+}
+
+function modelMatchesProvider(item, providerId = "") {
+  const id = String(item?.id || "").toLowerCase();
+  const group = normalizeProviderModelGroup(providerId);
+
+  if (!id) return false;
+  if (providerId === "hermes") return true;
+  if (providerId === "openrouter") return true;
+  if (group === "google") return id.startsWith("google/gemini") || id.startsWith("gemini-");
+  if (group === "openai") return id.startsWith("openai/");
+  if (group === "anthropic") return id.startsWith("anthropic/");
+  if (group === "deepseek") return id.startsWith("deepseek/");
+
+  return false;
+}
 
 const FREE_MODELS_BY_PROVIDER = {
   openrouter: [
@@ -348,6 +381,35 @@ export default function WorkbenchChatPanel({
       };
     });
   }, [favorites, liveModels]);
+
+  const selectedProviderOption = useMemo(() => {
+    return providerOptions.find((item) => item.id === provider) || providerOptions[0];
+  }, [provider]);
+
+  const selectedProviderLabel = selectedProviderOption?.label || provider || "Provider";
+
+  const authCliSelected = isAuthCliProviderId(provider);
+
+  const selectedCliModelGroup = useMemo(() => {
+    return cliModelGroups.find((group) => group.agentId === provider) || null;
+  }, [cliModelGroups, provider]);
+
+  const providerPresetModels = useMemo(() => {
+    const group = normalizeProviderModelGroup(provider);
+    return FREE_MODELS_BY_PROVIDER[group] || [];
+  }, [provider]);
+
+  const providerLiveModels = useMemo(() => {
+    if (authCliSelected) return [];
+    return liveModels
+      .filter((item) => modelMatchesProvider(item, provider))
+      .slice(0, 200);
+  }, [liveModels, provider, authCliSelected]);
+
+  const providerFavoriteModels = useMemo(() => {
+    if (authCliSelected) return [];
+    return favoriteModels.filter((item) => modelMatchesProvider(item, provider));
+  }, [favoriteModels, provider, authCliSelected]);
 
   async function loadWorkspace() {
     setWorkspaceError("");
@@ -831,6 +893,55 @@ export default function WorkbenchChatPanel({
     };
   }, [prompt, model, executionProfile, responseStyle, skills, toolsets]);
 
+
+  function handleProviderChange(nextProvider) {
+    setProvider(nextProvider);
+    setModel("");
+
+    if (isDirectApiProviderId(nextProvider)) {
+      setExecutionProfile("quick");
+      setSkills("");
+      setToolsets("");
+    }
+  }
+
+  function handleModelChange(nextModel) {
+    const parsedAuthModel = parseAuthCliModelValue(nextModel);
+
+    setModel(nextModel);
+
+    if (parsedAuthModel) {
+      setProvider(parsedAuthModel.agentId);
+    }
+  }
+
+  async function ensureRunSessionId({ dryRun, title, prompt, workspaceRoot }) {
+    if (dryRun) return activeSessionId || "";
+    if (activeSessionId) return activeSessionId;
+
+    const sessionRes = await fetch("/api/agent/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: String(title || prompt || "새 작업").slice(0, 60),
+        prompt: String(prompt || ""),
+        workspaceRoot
+      })
+    });
+
+    const sessionData = await sessionRes.json();
+
+    if (!sessionRes.ok || sessionData.ok === false || !sessionData.session?.sessionId) {
+      throw new Error(sessionData.error || "대화 세션 생성에 실패했습니다.");
+    }
+
+    const nextSessionId = sessionData.session.sessionId;
+
+    return nextSessionId;
+  }
+
   async function runAgent(dryRun, options = {}) {
     const promptSource = options.promptOverride ?? prompt;
     const trimmed = String(promptSource || "").trim();
@@ -877,7 +988,19 @@ export default function WorkbenchChatPanel({
       "F:\\mamabot"
     ).trim();
 
+    const requestMode =
+      executionProfile === "quick" && isAuthCliProviderId(requestProvider)
+        ? "edit"
+        : mode;
+
     try {
+      const runSessionId = await ensureRunSessionId({
+        dryRun,
+        title: trimmed,
+        prompt: trimmed,
+        workspaceRoot: runWorkspace
+      });
+
       const res = await fetch("/api/agent/run", {
         method: "POST",
         headers: {
@@ -891,14 +1014,14 @@ export default function WorkbenchChatPanel({
           displayPrompt: trimmed,
           provider: requestProvider,
           agentId: requestProvider,
-          mode,
+          mode: requestMode,
           model: requestModel,
           skills,
           toolsets,
           responseMode: responseStyle,
           executionProfile,
           dryRun,
-          sessionId: activeSessionId || "",
+          sessionId: runSessionId,
           allowHighTokenRisk: options.allowHighTokenRisk === true
         })
       });
@@ -913,8 +1036,10 @@ export default function WorkbenchChatPanel({
         onRunOpened(data.runId);
       }
 
-      if (data.sessionId && onSessionChanged) {
-        onSessionChanged(data.sessionId);
+      const nextSessionId = data.sessionId || runSessionId;
+
+      if (nextSessionId && onSessionChanged) {
+        onSessionChanged(nextSessionId);
       }
 
       if (data.runId && data.status === "blocked") {
@@ -1106,23 +1231,11 @@ export default function WorkbenchChatPanel({
       <div style={{ display: "flex", alignItems: "center",
           flexWrap: "wrap", gap: 8, flexWrap: "wrap" }}>
         <select
-          value={model}
-          onChange={(event) => {
-            const value = event.target.value;
-            const parsedAuthModel = parseAuthCliModelValue(value);
-
-            setModel(value);
-
-            if (parsedAuthModel) {
-              setProvider(parsedAuthModel.agentId);
-            }
-            // provider ??? ???? ?? ?? (?? ???? ???)
-          }}
+          value={provider}
+          onChange={(event) => handleProviderChange(event.target.value)}
           style={{
-            width: 360,
-            minWidth: 260,
-            maxWidth: 420,
-            flex: "0 1 360px",
+            width: 190,
+            minWidth: 170,
             border: "1px solid #d1d5db",
             background: "#ffffff",
             color: "#111827",
@@ -1134,46 +1247,78 @@ export default function WorkbenchChatPanel({
             fontWeight: 900,
             cursor: "pointer"
           }}
+          title="실행 Provider"
         >
-          <option value="">Hermes 기본 모델 사용</option>
-          {favoriteModels.length > 0 ? (
-            <optgroup label="즐겨찾기 모델">
-              {favoriteModels.map((item) => (
-                <option key={item.id} value={item.id}>
-                  🌟 {item.name}
+          {providerOptions.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={model}
+          onChange={(event) => handleModelChange(event.target.value)}
+          style={{
+            width: 360,
+            minWidth: 260,
+            maxWidth: 420,
+            flex: "0 0 auto",
+            border: "1px solid #d1d5db",
+            background: "#ffffff",
+            color: "#111827",
+            borderRadius: 10,
+            padding: "8px 10px",
+            height: 36,
+            fontSize: 12,
+            fontWeight: 900,
+            cursor: "pointer"
+          }}
+          title={selectedProviderLabel + " 모델"}
+        >
+          <option value="">
+            {authCliSelected ? selectedProviderLabel + " 기본 모델 사용" : selectedProviderLabel + " 기본 모델 사용"}
+          </option>
+
+          {authCliSelected && selectedCliModelGroup ? (
+            <optgroup label={"CLI 모델 · " + selectedCliModelGroup.label}>
+              {selectedCliModelGroup.models.map((item) => (
+                <option key={selectedCliModelGroup.agentId + ":" + item.id} value={item.id}>
+                  {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
                 </option>
               ))}
             </optgroup>
           ) : null}
-          {cliModelGroups.length > 0 ? (
-            <>
-              {cliModelGroups.map((group) => (
-                <optgroup key={group.agentId} label={"인증방식 모델 · " + group.label}>
-                  {group.models.map((item) => (
-                    <option
-                      key={group.agentId + ":" + item.id}
-                      value={makeAuthCliModelValue(group.agentId, item.id)}
-                    >
-                      {"🌟 "}{item.label || item.id}{formatBadgeText(item.badges)}
-                    </option>
-                  ))}
-                </optgroup>
+
+          {!authCliSelected && providerFavoriteModels.length > 0 ? (
+            <optgroup label="즐겨찾기 모델">
+              {providerFavoriteModels.map((item) => (
+                <option key={"fav-" + item.id} value={item.id}>
+                  🌟 {item.name || item.label || item.id}
+                </option>
               ))}
-            </>
+            </optgroup>
           ) : null}
 
-          {(FREE_MODELS_BY_PROVIDER[provider] || []).length > 0 && (
-              <optgroup label={(providerOptions.find(p => p.id === provider) || {}).label || provider}>
-                {(FREE_MODELS_BY_PROVIDER[provider] || []).map(item => (
-                  <option key={"pf-" + item.id} value={item.id}>{item.label}</option>
-                ))}
-              </optgroup>
-            )}
-          {liveModels.slice(0, 200).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name || item.id}
-            </option>
-          ))}
+          {!authCliSelected && providerPresetModels.length > 0 ? (
+            <optgroup label={selectedProviderLabel + " 추천 모델"}>
+              {providerPresetModels.map((item) => (
+                <option key={"preset-" + item.id} value={item.id}>
+                  {item.label || item.id}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+
+          {!authCliSelected && providerLiveModels.length > 0 ? (
+            <optgroup label={selectedProviderLabel + " Live 모델"}>
+              {providerLiveModels.map((item) => (
+                <option key={"live-" + item.id} value={item.id}>
+                  {item.name || item.label || item.id}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
 
         <input
@@ -1424,7 +1569,7 @@ export default function WorkbenchChatPanel({
             <div style={{ display: "grid", gap: 10 }}>
               <label style={{ display: "grid", gap: 6, fontSize: 12, fontWeight: 900 }}>
                 제공자
-                <select value={provider} onChange={(event) => setProvider(event.target.value)}>
+                <select value={provider} onChange={(event) => handleProviderChange(event.target.value)}>
                   {providerOptions.map((item) => (
                     <option key={item.id} value={item.id}>{item.label}</option>
                   ))}

@@ -1,100 +1,77 @@
-# Mamabot Project Index
+﻿# Mamabot Project Index
 
-이 파일은 에이전트가 전체 파일을 무작정 읽지 않도록 돕는 라우터 인덱스이다.
+Use this file only when workspace index candidates are not already provided.
 
-## 핵심 실행 파일
+## Core files
 
 ### app/api/agent/run/route.js
-- 역할: 에이전트 실행 API의 핵심 라우터
-- 관련 기능:
-  - Hermes 실행
-  - Claude Code / Codex CLI / Gemini CLI 인증형 실행
-  - workspaceRoot 처리
-  - 실행 결과 저장
-  - 권한/토큰/프로필 처리
+Agent run API.
+Relevant areas:
+- auth CLI routing
+- Codex CLI / Claude Code CLI / Gemini CLI execution
+- workspace index attachment
+- run save / session append
+- background execution
+- token budget guard
 
 ### app/components/WorkbenchChatPanel.jsx
-- 역할: 대시보드 채팅 UI
-- 관련 기능:
-  - 인증방식 선택
-  - 모델 선택
-  - workspace 선택
-  - 실행 요청
-  - 실행 결과 표시
-  - workspace index 갱신 버튼
+Workbench chat UI.
+Relevant areas:
+- provider/model selection
+- response mode selection
+- execution request body
+- session creation
+- polling/toast behavior
+- workspace index refresh button
 
-### app/components/AgentPanel.jsx
-- 역할: 기존 Agent 실행 패널
-- 관련 기능:
-  - provider/model 선택
-  - 실행 요청
-  - CLI 모델 선택기 일부
+### app/components/AppShell.jsx
+Main shell and side panels.
+Relevant areas:
+- dashboard/workbench layout
+- sidebar state
+- session/run panel switching
 
-### config/model-badges.json
-- 역할: 인증형 CLI 모델 목록
-- 관련 기능:
-  - Claude Code 모델 목록
-  - Codex CLI 모델 목록
-  - Gemini CLI 모델 목록
+### app/components/AgentRunHistoryPanel.jsx
+Run history UI.
+Relevant areas:
+- run list
+- run detail
+- output/compressed output display
+- workspace candidate display
 
-### app/lib/modelBadges.js
-- 역할: model-badges.json 로더
-
-### app/api/model-badges/route.js
-- 역할: 모델 목록 API
+### app/components/ConversationSidebar.jsx
+Conversation/session sidebar.
+Relevant areas:
+- session list
+- refresh
+- favorite/delete
+- run/message counts
 
 ### app/lib/workspaceIndex.js
-- 역할: workspace 인덱스 생성/검색
+Workspace index build/search logic.
 
-### app/api/workspace/index/route.js
-- 역할: workspace index 생성 API
+### app/lib/runStore.js
+Run persistence and run index.
 
-### app/api/workspace/index/search/route.js
-- 역할: workspace index 검색 API
+### app/lib/sessionStore.js
+Session persistence and message append.
 
-## 문서 파일
+### app/lib/tokenBudgetGuard.js
+Token budget estimation and blocking.
 
-### plan.md
-- 현재 목표와 다음 작업만 짧게 유지한다.
+### app/lib/commandOutputCompressor.js
+Command output compression.
 
-### .mamabot/ACTIVE_PLAN.md
-- 현재 진행 중인 작업만 기록한다.
+## Restricted by default
 
-### .mamabot/CHECKLIST.md
-- 완료/미완료 상태를 관리한다.
-
-### .mamabot/DECISIONS.md
-- 확정된 설계 결정을 기록한다.
-
-### .mamabot/WORKLOG.md
-- 긴 작업 기록을 보관한다.
-- 에이전트는 사용자가 명시적으로 요청하지 않는 한 자동으로 읽지 않는다.
-
-## 작업 원칙
-1. 먼저 이 PROJECT_INDEX.md를 확인한다.
-2. 관련 파일 위치를 찾는다.
-3. 필요한 파일만 부분적으로 읽는다.
-4. 수정 전 백업한다.
-5. 수정 후 git diff와 테스트 결과만 확인한다.
-
-
-## Agent router files
-
-### CLAUDE.md
-- Loaded by Claude Code.
-- Keep short.
-- Router only.
-
-### AGENTS.md
-- Loaded by Codex CLI.
-- Keep short.
-- Router only.
-
-### GEMINI.md
-- Loaded by Gemini CLI for project/coding mode.
-- Quick Chat should avoid project context.
-
-## Token-saving policy
-- Do not read .mamabot/WORKLOG.md unless explicitly requested.
-- Do not read backups, runtime logs, run history, node_modules, or .next unless the task specifically requires it.
-- Prefer targeted file ranges and index search.
+Do not read these unless explicitly requested:
+- .mamabot/CHECKLIST.md
+- .mamabot/DECISIONS.md
+- .mamabot/ACTIVE_PLAN.md
+- .mamabot/WORKLOG.md
+- runtime/
+- backups/
+- node_modules/
+- .next/
+- run logs
+- generated artifacts

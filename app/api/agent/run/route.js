@@ -50,7 +50,7 @@ function getAuthCliProviderLabel(provider = "") {
   return id || "Auth CLI Agent";
 }
 
-function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest" }) {
+function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspaceRoot = "", mode = "suggest", executionProfile = "" }) {
   const providerId = String(provider || "").trim();
   const selectedModel = String(model || "").trim();
   const safePrompt = String(prompt || "").trim();
@@ -80,25 +80,35 @@ function buildAuthCliCommand({ provider = "", model = "", prompt = "", workspace
   if (providerId === "codex-cli" || providerId === "codex") {
     const args = ["exec"];
 
-    // Codex???좊ː ?붾젆?좊━ 泥댄겕瑜?諛섎뱶???고쉶?댁빞 ??쒕낫??workspace?먯꽌???ㅽ뻾?쒕떎.
-    args.push("--skip-git-repo-check");
-
+    // Codex는 repo-native 코딩 에이전트로 쓰는 것이 핵심이다.
+    // 따라서 --skip-git-repo-check를 기본으로 넣지 않는다.
     if (workspaceRoot) {
       args.push("-C", workspaceRoot);
     }
 
-    args.push("--sandbox", "read-only");
+    const profile = String(executionProfile || "").trim();
+    const codexSandbox =
+      profile === "coding" || profile === "agent"
+        ? "workspace-write"
+        : "read-only";
 
-    // codex-default??紐⑤뜽紐낆쓣 鍮꾩썙??怨꾩젙 ?먮룞 紐⑤뜽濡??ㅽ뻾?쒕떎.
-    if (model && model !== "codex-default") {
-      args.push("-m", model);
+    args.push("--sandbox", codexSandbox);
+
+    // Codex 공식 config override.
+    // CLI -c 값이 config.toml보다 우선한다.
+    args.push("-c", "model_reasoning_effort=\"high\"");
+if (selectedModel && selectedModel !== "codex-default") {
+      args.push("-m", selectedModel);
     }
 
-    args.push(prompt);
+    // Codex exec는 "-" 사용 시 stdin에서 instructions를 읽는다.
+    // Windows .cmd/shell 경유에서 긴 한글 프롬프트가 인자로 누락되는 문제를 줄인다.
+    args.push("-");
 
     return {
       command: "codex",
       args,
+      stdin: safePrompt,
       homeDirName: "codex-home",
       usePortableHome: false,
       scrubKeys: ["OPENROUTER_API_KEY"]
@@ -139,6 +149,29 @@ function buildPowerShellCliInvocation(command = "", args = []) {
 }
 
 
+function buildQuickAuthCliPrompt({ prompt = "", responseMode = "" }) {
+  const raw = String(prompt || "").trim();
+  const mode = String(responseMode || "short").trim();
+
+  if (mode === "detailed") {
+    return [
+      "사용자의 요청에만 답하세요.",
+      "프로젝트 파일, 라우터 파일, CLAUDE.md, AGENTS.md, GEMINI.md 내용을 참고하지 마세요.",
+      "작업 제안이나 파일 수정 계획을 말하지 말고, 일반 대화처럼 답하세요.",
+      "",
+      raw
+    ].join("\n");
+  }
+
+  return [
+    "사용자의 요청에만 짧게 답하세요.",
+    "프로젝트 파일, 라우터 파일, CLAUDE.md, AGENTS.md, GEMINI.md 내용을 참고하지 마세요.",
+    "작업 제안이나 파일 수정 계획을 말하지 마세요.",
+    "",
+    raw
+  ].join("\n");
+}
+
 function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = "", executionProfile = "" }) {
   const raw = String(prompt || "").trim();
   const styleText = [responseMode, responseStyle, executionProfile]
@@ -169,10 +202,10 @@ function buildAuthCliPrompt({ prompt = "", responseMode = "", responseStyle = ""
   ].join("\n");
 }
 
-function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode }) {
+function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode, executionProfile }) {
   return new Promise((resolve) => {
     const root = process.cwd();
-    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode });
+    const spec = buildAuthCliCommand({ provider, model, prompt, workspaceRoot, mode, executionProfile });
 
     if (!spec) {
       resolve({
@@ -197,7 +230,12 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
       env.USERPROFILE = runtimeHome;
     }
 
-    for (const key of spec.scrubKeys || []) {
+    
+    if (String(provider || "").trim() === "gemini-cli") {
+      env.GEMINI_CLI_TRUST_WORKSPACE = "true";
+    }
+
+for (const key of spec.scrubKeys || []) {
       delete env[key];
     }
 
@@ -252,8 +290,29 @@ function runAuthCliOneshot({ runId, provider, model, prompt, workspaceRoot, mode
       env,
       shell: spawnUseShell,
       windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: [spec.stdin ? "pipe" : "ignore", "pipe", "pipe"]
     });
+
+    // AUTH_CLI_STDIN_WRITE_SAFE_SINGLE
+    if (spec.stdin && child.stdin) {
+      const stdinText = String(spec.stdin || "");
+      logLine(runId, "AUTH_CLI stdin chars=" + stdinText.length);
+
+      child.stdin.on("error", (stdinError) => {
+        logLine(runId, "AUTH_CLI stdin error=" + (stdinError?.message || String(stdinError)));
+      });
+
+      try {
+        if (!child.stdin.destroyed && child.stdin.writable) {
+          child.stdin.setDefaultEncoding("utf8");
+          child.stdin.end(stdinText.endsWith("\n") ? stdinText : stdinText + "\n", "utf8");
+        } else {
+          logLine(runId, "AUTH_CLI stdin skipped: stream not writable");
+        }
+      } catch (stdinWriteError) {
+        logLine(runId, "AUTH_CLI stdin write failed=" + (stdinWriteError?.message || String(stdinWriteError)));
+      }
+    }
 
     let stdout = "";
     let stderr = "";
@@ -806,59 +865,77 @@ let workspaceWsl = "";
         );
       }
 
-      const authCliPrompt = buildAuthCliPrompt({
-        prompt,
-        responseMode,
-        responseStyle: body.responseStyle || "",
-        executionProfile
-      });
+      const codexAuthCli = provider === "codex-cli" || provider === "codex";
+      const quickAuthCli = executionProfile === "quick" && !codexAuthCli;
+      const authCliWorkspaceRoot = quickAuthCli
+        ? path.join(getPortableRoot(), "runtime", "cli-chat-workdir")
+        : workspaceRoot;
 
-      const execution = await runAuthCliOneshot({
-        runId,
-        provider,
-        model,
-        prompt: authCliPrompt,
-        workspaceRoot,
-        mode
-      });
-
-
-      const stderrText = cleanAgentText(execution.stderr || "");
-      const output = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI ?ㅽ뻾 寃곌낵媛 鍮꾩뼱 ?덉뒿?덈떎.";
-      const stdoutText = output;
-      const executionOk = Boolean(execution.ok && output.trim());
-      const durationMs = Date.now() - startedAt;
-      const status = executionOk ? "success" : "failed";
-
-      let compressedOutput = "";
-      let outputCompression = null;
-
-      try {
-        const compressed = compressCommandOutput({
-          command: execution.command || "auth-cli",
-          stdout: output || "",
-          stderr: stderrText || ""
-        });
-
-        compressedOutput = compressed.compressed || compressed.output || "";
-        outputCompression = {
-          kind: compressed.kind || "unknown",
-          ...(compressed.meta || {})
-        };
-      } catch (compressionError) {
-        outputCompression = {
-          kind: "failed",
-          error: compressionError?.message || String(compressionError)
-        };
-        logLine(runId, "auth-cli outputCompression failed=" + outputCompression.error);
+      if (quickAuthCli) {
+        fs.mkdirSync(authCliWorkspaceRoot, { recursive: true });
       }
 
+      // AUTH_CLI_WORKSPACE_INDEX_V1
+      let authCliWorkspaceCandidates = [];
+      let authCliBasePrompt = displayPrompt || prompt;
+
+      if (executionProfile !== "quick") {
+        try {
+          const candidateResult = searchWorkspaceIndex(workspaceRoot, {
+            query: authCliBasePrompt,
+            limit: executionProfile === "coding" ? 8 : 5
+          });
+
+          authCliWorkspaceCandidates = candidateResult.items || [];
+
+          if (authCliWorkspaceCandidates.length > 0) {
+            logLine(runId, "auth-cli workspaceCandidates count=" + authCliWorkspaceCandidates.length);
+
+            for (const item of authCliWorkspaceCandidates.slice(0, 8)) {
+              logLine(
+                runId,
+                "auth-cli workspaceCandidate path=" +
+                  (item.path || "-") +
+                  " kind=" +
+                  (item.kind || "-") +
+                  " score=" +
+                  (item.score || 0)
+              );
+            }
+
+            authCliBasePrompt = attachWorkspaceCandidatesToPrompt(
+              authCliBasePrompt,
+              authCliWorkspaceCandidates
+            );
+          } else {
+            logLine(runId, "auth-cli workspaceCandidates count=0");
+          }
+        } catch (indexError) {
+          authCliWorkspaceCandidates = [];
+          logLine(runId, "auth-cli workspaceCandidates failed=" + (indexError?.message || String(indexError)));
+        }
+      }
+
+      const authCliPrompt = quickAuthCli
+        ? buildQuickAuthCliPrompt({
+            prompt: authCliBasePrompt,
+            responseMode
+          })
+        : buildAuthCliPrompt({
+            prompt: authCliBasePrompt,
+            responseMode,
+            responseStyle: body.responseStyle || "",
+            executionProfile
+          });
+
+      const authCliMode = quickAuthCli ? "edit" : mode;
+
       try {
-        const saved = saveRun({
+        const runningRecord = saveRun({
           runId,
           createdAt,
-          status,
-          ok: executionOk,
+          status: "running",
+          ok: true,
           dryRun: false,
           sessionId,
           provider,
@@ -875,41 +952,208 @@ let workspaceWsl = "";
           workspaceRoot,
           workspaceWsl,
           prompt: displayPrompt || prompt,
-          output,
-          stderr: stderrText || "",
-          compressedOutput,
-          outputCompression,
-          error: executionOk ? "" : (stderrText || "Auth CLI ?ㅽ뻾???ㅽ뙣?덉뒿?덈떎."),
-          exitCode: execution.exitCode,
-          durationMs,
+          output: "",
+          stderr: "",
+          compressedOutput: "",
+          outputCompression: null,
+          error: "",
+          exitCode: null,
+          durationMs: 0,
           usage: null,
           tokenBudget: null,
           memorySync: null,
-          workspaceCandidates: [],
-          command: execution.command || "auth-cli",
+          workspaceCandidates: authCliWorkspaceCandidates,
+          command: "auth-cli",
           logPath: getLogPath()
         });
 
-        logLine(runId, "SAVE auth-cli run=" + saved.runId + " status=" + saved.status);
-      } catch (saveError) {
-        logLine(runId, "SAVE ERROR auth-cli " + (saveError?.message || String(saveError)));
+        if (sessionId) {
+          appendRunToSession(sessionId, {
+            ...runningRecord,
+            prompt: displayPrompt || prompt,
+            output: "",
+            stderr: "",
+            error: ""
+          });
+        }
+
+        logLine(runId, "BACKGROUND auth-cli accepted session=" + (sessionId || "-"));
+      } catch (initialSaveError) {
+        logLine(runId, "BACKGROUND auth-cli initial save failed=" + (initialSaveError?.message || String(initialSaveError)));
       }
 
+      void (async () => {
+        try {
+          const execution = await runAuthCliOneshot({
+            runId,
+            provider,
+            model,
+            prompt: authCliPrompt,
+            workspaceRoot: authCliWorkspaceRoot,
+            mode: authCliMode,
+            executionProfile
+          });
+
+          const stderrText = cleanAgentText(execution.stderr || "");
+          const output = cleanAuthCliOutput(execution.stdout || "", execution.stderr || "") || stderrText || "Auth CLI 실행 결과가 비어 있습니다.";
+          const executionOk = Boolean(execution.ok && output.trim());
+          const durationMs = Date.now() - startedAt;
+          const status = executionOk ? "success" : "failed";
+
+          let compressedOutput = "";
+          let outputCompression = null;
+
+          try {
+            const compressed = compressCommandOutput({
+              command: execution.command || "auth-cli",
+              stdout: output || "",
+              stderr: stderrText || ""
+            });
+
+            compressedOutput = compressed.compressed || compressed.output || "";
+            outputCompression = {
+              kind: compressed.kind || "unknown",
+              ...(compressed.meta || {})
+            };
+          } catch (compressionError) {
+            outputCompression = {
+              kind: "failed",
+              error: compressionError?.message || String(compressionError)
+            };
+            logLine(runId, "auth-cli outputCompression failed=" + outputCompression.error);
+          }
+
+          const saved = saveRun({
+            runId,
+            createdAt,
+            status,
+            ok: executionOk,
+            dryRun: false,
+            sessionId,
+            provider,
+            model,
+            mode,
+            skills,
+            toolsets,
+            responseMode,
+            executionProfile: executionProfile || "quick",
+            contextPolicy: contextPolicy || "minimal",
+            sessionContextUsed: false,
+            memorySyncUsed: false,
+            engine: "auth-cli",
+            workspaceRoot,
+            workspaceWsl,
+            prompt: displayPrompt || prompt,
+            output,
+            stderr: stderrText || "",
+            compressedOutput,
+            outputCompression,
+            error: executionOk ? "" : (stderrText || "Auth CLI 실행에 실패했습니다."),
+            exitCode: execution.exitCode,
+            durationMs,
+            usage: null,
+            tokenBudget: null,
+            memorySync: null,
+            workspaceCandidates: authCliWorkspaceCandidates,
+            command: execution.command || "auth-cli",
+            logPath: getLogPath()
+          });
+
+          logLine(runId, "SAVE auth-cli background run=" + saved.runId + " status=" + saved.status);
+
+          if (sessionId) {
+            const attachedSession = appendRunToSession(sessionId, {
+              ...saved,
+              prompt: "",
+              output,
+              stderr: stderrText || "",
+              error: executionOk ? "" : (stderrText || "Auth CLI 실행에 실패했습니다."),
+              compressedOutput,
+              outputCompression
+            });
+
+            logLine(
+              runId,
+              "ATTACH auth-cli background session=" +
+                sessionId +
+                " attached=" +
+                Boolean(attachedSession)
+            );
+          } else {
+            logLine(runId, "ATTACH auth-cli background skipped: sessionId empty");
+          }
+        } catch (backgroundError) {
+          const errorText = backgroundError?.message || String(backgroundError);
+
+          logLine(runId, "BACKGROUND auth-cli failed=" + errorText);
+
+          try {
+            const failed = saveRun({
+              runId,
+              createdAt,
+              status: "failed",
+              ok: false,
+              dryRun: false,
+              sessionId,
+              provider,
+              model,
+              mode,
+              skills,
+              toolsets,
+              responseMode,
+              executionProfile: executionProfile || "quick",
+              contextPolicy: contextPolicy || "minimal",
+              sessionContextUsed: false,
+              memorySyncUsed: false,
+              engine: "auth-cli",
+              workspaceRoot,
+              workspaceWsl,
+              prompt: displayPrompt || prompt,
+              output: "",
+              stderr: errorText,
+              compressedOutput: "",
+              outputCompression: null,
+              error: errorText,
+              exitCode: null,
+              durationMs: Date.now() - startedAt,
+              usage: null,
+              tokenBudget: null,
+              memorySync: null,
+              workspaceCandidates: authCliWorkspaceCandidates,
+              command: "auth-cli",
+              logPath: getLogPath()
+            });
+
+            if (sessionId) {
+              appendRunToSession(sessionId, {
+                ...failed,
+                prompt: "",
+                output: "",
+                stderr: errorText,
+                error: errorText
+              });
+            }
+          } catch (saveFailedError) {
+            logLine(runId, "BACKGROUND auth-cli failed-save failed=" + (saveFailedError?.message || String(saveFailedError)));
+          }
+        }
+      })();
+
       return NextResponse.json({
-        ok: Boolean(executionOk),
+        ok: true,
         runId,
+        sessionId,
         provider,
         model,
         mode,
-        status,
+        status: "running",
         engine: "auth-cli",
-        command: execution.command,
-        output,
-        error: executionOk ? "" : (stderrText || "Auth CLI ?ㅽ뻾???ㅽ뙣?덉뒿?덈떎."),
-        exitCode: execution.exitCode,
-        durationMs,
-        message: executionOk ? "Auth CLI execution finished." : "Auth CLI execution failed."
-      }, { status: executionOk ? 200 : 500 });
+        message: "Auth CLI background execution started.",
+        executionProfile,
+        contextPolicy,
+        workspaceCandidateCount: authCliWorkspaceCandidates.length,
+        workspaceCandidates: authCliWorkspaceCandidates
+      });
     }
 
     if (!prompt.trim()) {

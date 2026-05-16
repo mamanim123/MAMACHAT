@@ -1,57 +1,43 @@
-# Mamabot Codex Agent Guide
+﻿# Mamabot Agent Rules
 
-# Mamabot Agent Router Guide
+## Primary rule
+Use the smallest possible context. Do not scan the whole repository.
 
-This file is intentionally short because it may be loaded at the start of agent sessions.
+## Context loading policy
+1. If the prompt already contains `[WORKSPACE INDEX CANDIDATES]`, use those candidate files first.
+2. Do not read `PROJECT_INDEX.md` when workspace candidates are already provided.
+3. If no workspace candidates are provided, read `.mamabot/PROJECT_INDEX.md` once to locate relevant files.
+4. Do not read `.mamabot/CHECKLIST.md`, `.mamabot/DECISIONS.md`, `.mamabot/ACTIVE_PLAN.md`, or `.mamabot/WORKLOG.md` unless the user explicitly asks about planning, status, decisions, checklist, or work history.
+5. Never read `runtime/`, `backups/`, `.next/`, `node_modules/`, run logs, or generated files unless directly requested.
 
-## Project role
-Mamabot is a portable personal agent dashboard for running Hermes Agent, Claude Code, Codex CLI, Gemini CLI, and verified model providers from one UI.
+## File reading policy
+- Do not read an entire large file.
+- Prefer targeted ranges, search results, or small snippets.
+- For `app/api/agent/run/route.js`, inspect only the relevant function/block first.
+- If more context is needed, explain why before expanding.
 
-## First-read rule
-Do not scan the entire project first.
+## Mode policy
+### Quick
+- Do not read project files.
+- Answer briefly.
 
-Before reading source files, check:
+### Review
+- Read only relevant snippets.
+- Do not modify files.
+- Summarize issues clearly.
 
-1. .mamabot/PROJECT_INDEX.md
-2. .mamabot/ACTIVE_PLAN.md
-3. .mamabot/CHECKLIST.md
-4. .mamabot/DECISIONS.md
+### Coding
+- Use workspace candidates first.
+- Before modifying files, create a backup outside the project when possible.
+- After changes, run the smallest useful verification.
 
-Use those files to locate the exact source files needed for the task.
+### Agent
+- Use project context only as needed.
+- Avoid broad exploration.
+- Keep output concise.
 
-## Do not auto-read
-Do not read these unless the user explicitly asks:
-
-- .mamabot/WORKLOG.md
-- old plan history
-- backups/
-- runtime/hermes/runs/
-- runtime/hermes/logs/
-- node_modules/
-- .next/
-- large generated files
-
-## plan.md rule
-plan.md must stay short. It only contains the current goal and next steps.
-Long history belongs in .mamabot/WORKLOG.md.
-
-## Work method
-1. Identify the task type.
-2. Check .mamabot/PROJECT_INDEX.md for relevant files.
-3. Read only the smallest necessary file ranges.
-4. Before editing, create an external backup under F:\_mamabot_backups.
-5. Make the smallest safe change.
-6. Verify with targeted checks, not full-project scans.
-7. Summarize changed files and next checks.
-
-## Safety
-- Do not modify user workspaces unless explicitly asked.
-- Do not run destructive commands.
-- Do not expose secrets or tokens.
-- Prefer suggest/plan mode before write mode.
-
-
-## Codex-specific notes
-- This file is the repo-level instruction file for Codex.
-- Keep it short and practical.
-- If subdirectory-specific rules are needed later, add smaller AGENTS.md files closer to that code.
+## Output policy
+- Korean by default.
+- Do not mention internal model/provider unless asked.
+- Report what files were read.
+- Report if a file was not read because it was unnecessary.

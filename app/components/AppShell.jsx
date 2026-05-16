@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import AgentPanel from "./AgentPanel.jsx";
 import AgentRunHistoryPanel from "./AgentRunHistoryPanel.jsx";
 import CronPanel from "./CronPanel.jsx";
 import DashboardPanel from "./DashboardPanel.jsx";
@@ -105,8 +104,8 @@ const [activeSessionId, setActiveSessionId] = useState("");
     }
 
     if (activeTab === "chat") {
-      return <AgentPanel activeSessionId={activeSessionId} onSessionChanged={handleSessionChanged} />;
-    }
+    return <DashboardPanel activeSessionId={activeSessionId} activeRunId={activeRunId} resetKey={workbenchResetKey} onSessionChanged={handleSessionChanged} onRunOpened={setActiveRunId} onOpenTab={setActiveTab} />;
+  }
 
     if (activeTab === "history") {
       return <AgentRunHistoryPanel initialRunId={activeRunId} />;
