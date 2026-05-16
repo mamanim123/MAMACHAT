@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { getPortableRoot } from "./portablePaths.js";
@@ -400,7 +400,30 @@ function expandSearchTokens(tokens) {
   return Array.from(out);
 }
 
-function scoreWorkspaceFile(file, tokens) {
+function normalizeWorkspacePathCandidate(value = "") {
+  return normalizeSlash(String(value || ""))
+    .trim()
+    .replace(/^["'`([{<]+/, "")
+    .replace(/["'`)\]}>.,;:]+$/, "")
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "")
+    .toLowerCase();
+}
+
+function extractExplicitWorkspacePaths(query = "") {
+  const text = String(query || "");
+  const matches = text.match(/(?:[A-Za-z0-9_.\-\[\]@()]+[\\/])+[A-Za-z0-9_.\-\[\]@()]+\.[A-Za-z0-9]+/g) || [];
+
+  return Array.from(
+    new Set(
+      matches
+        .map((item) => normalizeWorkspacePathCandidate(item))
+        .filter((item) => item.includes("/") && item.length >= 5)
+    )
+  ).slice(0, 20);
+}
+
+function scoreWorkspaceFile(file, tokens, explicitPaths = []) {
   const pathText = String(file.path || "").toLowerCase();
   const nameText = String(file.name || "").toLowerCase();
   const kindText = String(file.kind || "").toLowerCase();
@@ -408,6 +431,14 @@ function scoreWorkspaceFile(file, tokens) {
 
   const haystack = [pathText, nameText, kindText, extText].join(" ");
   let score = 0;
+  const normalizedPath = normalizeWorkspacePathCandidate(file.path || "");
+
+  if (
+    Array.isArray(explicitPaths) &&
+    explicitPaths.some((explicitPath) => normalizedPath === explicitPath || normalizedPath.endsWith("/" + explicitPath))
+  ) {
+    score += 1000;
+  }
 
   for (const token of tokens) {
     if (!token) continue;
@@ -453,12 +484,13 @@ export function searchWorkspaceIndex(workspaceRoot, options = {}) {
 
   const baseTokens = tokenizeSearchQuery(query);
   const tokens = expandSearchTokens(baseTokens);
+  const explicitPaths = extractExplicitWorkspacePaths(query);
 
   const scored = Array.isArray(files)
     ? files
         .map((file) => ({
           ...file,
-          score: scoreWorkspaceFile(file, tokens)
+          score: scoreWorkspaceFile(file, tokens, explicitPaths)
         }))
         .filter((file) => file.score > 0)
         .sort((a, b) => {
@@ -471,7 +503,7 @@ export function searchWorkspaceIndex(workspaceRoot, options = {}) {
     ? routes
         .map((file) => ({
           ...file,
-          score: scoreWorkspaceFile(file, tokens) + 4
+          score: scoreWorkspaceFile(file, tokens, explicitPaths) + 4
         }))
         .filter((file) => file.score > 0)
     : [];
@@ -506,9 +538,9 @@ export function searchWorkspaceIndex(workspaceRoot, options = {}) {
     ok: true,
     query,
     tokens,
+    explicitPaths,
     summary,
     totalFiles: Array.isArray(files) ? files.length : 0,
     items
   };
 }
-
