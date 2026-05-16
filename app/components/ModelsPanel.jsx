@@ -195,9 +195,12 @@ export default function ModelsPanel() {
         })
       });
 
-      setMessage(`${envKey.trim()} 저장 완료`);
-      setEnvKey("");
+      const savedKey = envKey.trim();
+
+      setMessage(`[완료] ${savedKey} 저장 완료. 환경변수 목록을 새로고침했습니다.`);
+      setEnvKey(savedKey);
       setEnvValue("");
+      window.dispatchEvent(new CustomEvent("mamabot:models-refresh", { detail: { envKey: savedKey } }));
       await loadAll();
     } catch (err) {
       setError(err.message || String(err));
