@@ -1,0 +1,13 @@
+﻿node_modules/
+.next/
+out/
+dist/
+build/
+
+runtime/
+backups/
+.env
+.env.*
+*.log
+
+F:\_mamabot_backups/
