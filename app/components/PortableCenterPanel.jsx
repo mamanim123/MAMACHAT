@@ -79,6 +79,18 @@ export default function PortableCenterPanel() {
   const doctorCommand = "powershell -ExecutionPolicy Bypass -File .\\scripts\\portable\\doctor-mamabot.ps1 -Repair";
   const startCommand = ".\\start-mamabot.bat";
   const cliInstallCommand = "cd F:\\mamabot\\runtime\\cli; npm install";
+  const hermesOk = Boolean(status?.version);
+  const modelOk = Boolean(model?.model);
+  const contextOk = Number(model?.effective_context_length || 0) >= 64000;
+  const openrouterOk = Boolean(openrouter?.count);
+  const claudeInstalled = claude?.installed === true;
+  const claudeConnected = claude?.connected === true;
+  const claudeReadyText = claudeInstalled
+    ? "installed"
+    : claudeConnected
+      ? "credential only / CLI missing"
+      : "not ready";
+
 
   return (
     <div style={{ maxWidth: 1180, margin: "0 auto" }}>
@@ -125,14 +137,15 @@ export default function PortableCenterPanel() {
       >
         <h3 style={{ margin: "0 0 12px", fontSize: 18 }}>{"\uD3EC\uD130\uBE14 \uD575\uC2EC \uC0C1\uD0DC"}</h3>
 
-        <Row label="Hermes Dashboard" value={status?.version ? "OK / v" + status.version : "?? ??"} ok={Boolean(status?.version)} />
+        <Row label="Hermes Dashboard / Proxy" value={hermesOk ? "OK / v" + status.version : "checking"} ok={hermesOk} />
         <Row label="Hermes Home" value={status?.hermes_home || "-"} ok={Boolean(status?.hermes_home)} />
-        <Row label="Hermes Model" value={model?.model || "-"} ok={Boolean(model?.model)} />
-        <Row label="Hermes Context" value={model?.effective_context_length ? String(model.effective_context_length) : "-"} ok={Number(model?.effective_context_length || 0) >= 64000} />
-        <Row label="OpenRouter Models" value={openrouter?.count ? String(openrouter.count) + " models" : "?? ??"} ok={Boolean(openrouter?.count)} />
-        <Row label="Claude CLI Installed" value={claude?.installed ? "installed" : "not installed"} ok={claude?.installed === true} />
-        <Row label="Claude CLI Connected" value={claude?.connected ? "connected" : "not connected"} ok={claude?.connected === true} />
-        <Row label="Claude Bin" value={claude?.claudeBinWin || "-"} ok={claude?.installed === true} />
+        <Row label="Hermes Provider" value={model?.provider || "-"} ok={modelOk} />
+        <Row label="Hermes Model" value={model?.model || "-"} ok={modelOk} />
+        <Row label="Hermes Context" value={model?.effective_context_length ? String(model.effective_context_length) + " / 64000 required" : "-"} ok={contextOk} />
+        <Row label="OpenRouter Models" value={openrouterOk ? String(openrouter.count) + " models" : "checking"} ok={openrouterOk} />
+        <Row label="Claude CLI State" value={claudeReadyText} ok={claudeInstalled} />
+        <Row label="Claude Credential" value={claudeConnected ? "connected" : "not connected"} ok={claudeConnected} />
+        <Row label="Claude Bin" value={claude?.claudeBinWin || "-"} ok={claudeInstalled} />
       </section>
 
       <section
