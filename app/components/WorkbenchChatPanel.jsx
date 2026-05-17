@@ -308,6 +308,110 @@ function isDoneStatus(status) {
   return ["success", "failed", "stopped", "blocked", "dryrun"].includes(String(status || ""));
 }
 
+
+function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skills = "", toolsets = "" } = {}) {
+  const p = String(provider || "").toLowerCase().trim().replace(/_/g, "-");
+  const profile = String(executionProfile || "quick").toLowerCase().trim();
+  const hasSkills = Boolean(String(skills || "").trim());
+  const hasToolsets = Boolean(String(toolsets || "").trim());
+
+  const cliProviders = new Set(["claude-code", "codex-cli", "codex", "gemini-cli", "openclaude", "claude"]);
+  const localProviders = new Set(["ollama", "lm-studio", "local", "llama-cpp", "vllm"]);
+
+  if (cliProviders.has(p)) {
+    return {
+      engine: "CLI Agent",
+      tone: "purple",
+      detail: "\u0072\u0075\u006e\u0074\u0069\u006d\u0065\u002f\u0063\u006c\u0069 \uAE30\uBC18 \uC2E4\uD589",
+      skills: "Off",
+      memory: "Off",
+      session: "Off",
+      context: "CLI"
+    };
+  }
+
+  if (localProviders.has(p)) {
+    return {
+      engine: "Local Model",
+      tone: "gray",
+      detail: "\uB85C\uCEEC \u0065\u006e\u0064\u0070\u006f\u0069\u006e\u0074 \uAE30\uBC18 \uC2E4\uD589",
+      skills: "Off",
+      memory: "Off",
+      session: "Off",
+      context: "Local"
+    };
+  }
+
+  if (profile === "quick") {
+    return {
+      engine: "Direct API",
+      tone: "blue",
+      detail: "Quick\uC740 Hermes\uB97C \uAC70\uCE58\uC9C0 \uC54A\uACE0 API\uB85C \uC9C1\uC811 \uD638\uCD9C",
+      skills: "Off",
+      memory: "Off",
+      session: "Off",
+      context: "Minimal"
+    };
+  }
+
+  if (profile === "coding") {
+    return {
+      engine: "Hermes Agent",
+      tone: "green",
+      detail: "\uCF54\uB4DC \uC791\uC5C5\uC6A9 \u00b7 \uD328\uCE58 \uC2B9\uC778 \uAD8C\uC7A5",
+      skills: hasSkills || hasToolsets ? "On" : "Recommended",
+      memory: "On",
+      session: "On",
+      context: "64K+"
+    };
+  }
+
+  if (profile === "review") {
+    return {
+      engine: "Hermes Review",
+      tone: "orange",
+      detail: "\uAC80\uD1A0 \uC911\uC2EC \u00b7 \uD30C\uC77C \uC218\uC815 \uAE08\uC9C0 \uAD8C\uC7A5",
+      skills: hasSkills || hasToolsets ? "On" : "Optional",
+      memory: "Optional",
+      session: "On",
+      context: "64K+"
+    };
+  }
+
+  if (profile === "automation") {
+    return {
+      engine: "Hermes Automation",
+      tone: "orange",
+      detail: "Cron / Workflow / Gateway",
+      skills: hasSkills || hasToolsets ? "On" : "Required",
+      memory: "On",
+      session: "On",
+      context: "64K+"
+    };
+  }
+
+  return {
+    engine: "Hermes Agent",
+    tone: "green",
+    detail: "\uBD84\uC11D / \uACC4\uD68D\uC6A9 Hermes Agent \uC2E4\uD589",
+    skills: hasSkills || hasToolsets ? "On" : "Optional",
+    memory: "On",
+    session: "On",
+    context: "64K+"
+  };
+}
+
+function getExecutionRouteStyle(tone = "blue") {
+  const map = {
+    blue: { bg: "#eff6ff", border: "#bfdbfe", fg: "#1d4ed8" },
+    green: { bg: "#ecfdf5", border: "#bbf7d0", fg: "#047857" },
+    purple: { bg: "#f5f3ff", border: "#ddd6fe", fg: "#6d28d9" },
+    orange: { bg: "#fff7ed", border: "#fed7aa", fg: "#c2410c" },
+    gray: { bg: "#f9fafb", border: "#e5e7eb", fg: "#374151" }
+  };
+  return map[tone] || map.blue;
+}
+
 export default function WorkbenchChatPanel({
   activeSessionId = "",
   activeRunId = "",
@@ -361,6 +465,15 @@ export default function WorkbenchChatPanel({
   const ttsAudioRef = useRef(null);
   const [tokenPreview, setTokenPreview] = useState(null);
   const [tokenPreviewLoading, setTokenPreviewLoading] = useState(false);
+
+  const executionRoute = getExecutionRouteInfo({
+    provider,
+    executionProfile,
+    skills,
+    toolsets
+  });
+  const executionRouteStyle = getExecutionRouteStyle(executionRoute.tone);
+
 
   const abortRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -1826,6 +1939,31 @@ async function speakAssistantMessage(content) {
         >
           {workspaceIndexing ? "인덱싱 중" : "인덱스 갱신"}
         </button>
+
+        <div
+          data-role="execution-route-badge"
+          title={executionRoute.detail}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: "1px solid " + executionRouteStyle.border,
+            background: executionRouteStyle.bg,
+            color: executionRouteStyle.fg,
+            borderRadius: 999,
+            padding: "7px 10px",
+            height: 36,
+            boxSizing: "border-box",
+            flex: "0 0 auto",
+            fontSize: 12,
+            fontWeight: 950,
+            whiteSpace: "nowrap"
+          }}
+        >
+          <span>{"\uC2E4\uD589 \uACBD\uB85C"}</span>
+          <strong>{executionRoute.engine}</strong>
+          <span style={{ opacity: 0.85 }}>{executionRoute.context}</span>
+        </div>
 
         <select
           value={`${executionProfile}:${responseStyle}`}

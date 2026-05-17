@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import AgentRunHistoryPanel from "./AgentRunHistoryPanel.jsx";
-import CronPanel from "./CronPanel.jsx";
+import AutomationPanel from "./AutomationPanel.jsx";
 import DashboardPanel from "./DashboardPanel.jsx";
-import HermesSetupPanel from "./HermesSetupPanel.jsx";
-import HermesDashboardPanel from "./HermesDashboardPanel.jsx";
+import HermesManagementPanel from "./HermesManagementPanel.jsx";
 import LogsPanel from "./LogsPanel.jsx";
 import AISettingsPanel from "./AISettingsPanel.jsx";
 import PatchApprovalPanel from "./PatchApprovalPanel.jsx";
@@ -15,10 +14,10 @@ import Sidebar from "./Sidebar.jsx";
 import SkillsPanel from "./SkillsPanel.jsx";
 import SettingsPanel from "./SettingsPanel.jsx";
 import TopStatusBar from "./TopStatusBar.jsx";
-import WorkflowTemplatesPanel from "./WorkflowTemplatesPanel.jsx";
 import WorkspaceSelector from "./WorkspaceSelector.jsx";
 import ConversationSidebar from "./ConversationSidebar.jsx";
 import RunCompletionToast from "./RunCompletionToast.jsx";
+import PortableCenterPanel from "./PortableCenterPanel.jsx";
 
 export default function AppShell() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -116,12 +115,8 @@ const [activeSessionId, setActiveSessionId] = useState("");
       return <LogsPanel />;
     }
 
-    if (activeTab === "hermes") {
-      return <HermesSetupPanel />;
-    }
-
-    if (activeTab === "hermesDashboard") {
-      return <HermesDashboardPanel />;
+    if (activeTab === "hermes" || activeTab === "hermesDashboard") {
+      return <HermesManagementPanel />;
     }
 
     if (activeTab === "chat") {
@@ -140,12 +135,12 @@ const [activeSessionId, setActiveSessionId] = useState("");
       return <PatchApprovalPanel />;
     }
 
-    if (activeTab === "workflows") {
-      return <WorkflowTemplatesPanel />;
+    if (activeTab === "workflows" || activeTab === "automations") {
+      return <AutomationPanel />;
     }
 
-    if (activeTab === "automations") {
-      return <CronPanel />;
+    if (activeTab === "portable") {
+      return <PortableCenterPanel />;
     }
 
     if (activeTab === "settings") {
@@ -155,7 +150,7 @@ const [activeSessionId, setActiveSessionId] = useState("");
     return <DashboardPanel />;
   }
 
-  const isWorkbench = activeTab === "dashboard";
+  const isWorkbench = activeTab === "dashboard" || activeTab === "chat";
 
   return (
     <div

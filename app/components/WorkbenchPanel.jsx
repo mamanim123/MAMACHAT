@@ -125,7 +125,7 @@ export default function WorkbenchPanel({
             whiteSpace: "nowrap"
           }}
         >
-          대시보드
+          작업대
         </h1>
 
         <StatusBadge

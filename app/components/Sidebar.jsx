@@ -3,18 +3,16 @@
 import { useState } from "react";
 
 const items = [
-  { id: "dashboard", label: "\uB300\uC2DC\uBCF4\uB4DC", icon: "\u{1F3E0}" },
-  { id: "chat", label: "\uC791\uC5C5 \uCC44\uD305", icon: "\u{1F4AC}" },
+  { id: "dashboard", label: "\uC791\uC5C5\uB300", icon: "\u{1F3E0}" },
   { id: "history", label: "\uC2E4\uD589 \uC774\uB825", icon: "\u{1F5C2}\uFE0F" },
-  { id: "sessions", label: "\uC791\uC5C5 \uC138\uC158", icon: "\u{23F1}\uFE0F" },
+  { id: "sessions", label: "\uC138\uC158", icon: "\u{1F9F5}" },
   { id: "patches", label: "\uD328\uCE58 \uC2B9\uC778", icon: "\u{1F9E9}" },
-  { id: "workflows", label: "\uC6CC\uD06C\uD50C\uB85C\uC6B0", icon: "\u{1F501}" },
-  { id: "models", label: "\uBAA8\uB378 / \uC778\uC99D", icon: "\u{1F9E0}" },
-  { id: "skills", label: "\uC2A4\uD0AC", icon: "\u{1F6E0}\uFE0F" },
-  { id: "automations", label: "\uC790\uB3D9\uD654 / Cron", icon: "\u{23F0}" },
+  { id: "models", label: "\uBAA8\uB378 / \uC778\uC99D", icon: "\u{1F916}" },
+  { id: "skills", label: "\uC2A4\uD0AC / \uD50C\uB7EC\uADF8\uC778", icon: "\u{1F6E0}\uFE0F" },
+  { id: "automations", label: "\uC790\uB3D9\uD654", icon: "\u{23F1}\uFE0F" },
   { id: "logs", label: "\uB85C\uADF8", icon: "\u{1F4DC}" },
-  { id: "hermes", label: "Hermes \uC124\uC815", icon: "\u2699\uFE0F" },
-  { id: "hermesDashboard", label: "Hermes \uB300\uC2DC\uBCF4\uB4DC", icon: "\u{1F4CA}" },
+  { id: "hermes", label: "Hermes \uAD00\uB9AC", icon: "\u{1F9EC}" },
+  { id: "portable", label: "\uD3EC\uD130\uBE14 \uC13C\uD130", icon: "\u{1F9F3}" },
   { id: "settings", label: "\uC124\uC815", icon: "\u{1F527}" }
 ];
 
