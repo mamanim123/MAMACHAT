@@ -1281,7 +1281,7 @@ let workspaceWsl = "";
 
     const permCheck = checkPermission({
       mode,
-      action: permissionProfile.executionProfile === "quick" ? "read" : (dryRun ? "read" : "execute"),
+      action: mode === "suggest" ? "read" : (permissionProfile.executionProfile === "quick" ? "read" : (dryRun ? "read" : "execute")),
       target: prompt.slice(0, 200),
     });
     if (!permCheck.allowed) {
