@@ -65,6 +65,26 @@ function modelMatchesProvider(item, providerId = "") {
   return false;
 }
 
+function inferProviderFromModelValue(modelValue = "", currentProvider = "") {
+  const raw = String(modelValue || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (!raw) return "";
+
+  const parsedAuth = parseAuthCliModelValue(raw);
+  if (parsedAuth?.agentId) return parsedAuth.agentId;
+
+  if (lower.startsWith("claude-")) return "claude-code";
+  if (lower.startsWith("anthropic/")) return "anthropic-api";
+  if (lower.startsWith("google/gemini") || lower.startsWith("gemini-")) return "gemini-api";
+  if (lower.startsWith("openai/")) return "openai-api";
+  if (lower.startsWith("deepseek/")) return "deepseek";
+  if (lower.startsWith("groq/")) return "groq";
+  if (lower.startsWith("nvidia/")) return "nvidia";
+  if (lower.startsWith("cloudflare/") || lower.startsWith("@cf/")) return "cloudflare";
+
+  return currentProvider || "";
+}
 const FREE_MODELS_BY_PROVIDER = {
   openrouter: [
     { id: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super ✅검증" },
@@ -315,18 +335,36 @@ function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skil
   const hasSkills = Boolean(String(skills || "").trim());
   const hasToolsets = Boolean(String(toolsets || "").trim());
 
-  const cliProviders = new Set(["claude-code", "codex-cli", "codex", "gemini-cli", "openclaude", "claude"]);
-  const localProviders = new Set(["ollama", "lm-studio", "local", "llama-cpp", "vllm"]);
+  const cliProviders = new Set([
+    "claude-code",
+    "codex-cli",
+    "codex",
+    "gemini-cli",
+    "openclaude",
+    "claude"
+  ]);
+
+  const localProviders = new Set([
+    "ollama",
+    "lm-studio",
+    "local",
+    "llama-cpp",
+    "vllm"
+  ]);
 
   if (cliProviders.has(p)) {
+    const isQuickCli = profile === "quick";
+
     return {
       engine: "CLI Agent",
       tone: "purple",
-      detail: "\u0072\u0075\u006e\u0074\u0069\u006d\u0065\u002f\u0063\u006c\u0069 \uAE30\uBC18 \uC2E4\uD589",
+      detail: isQuickCli
+        ? "CLI Quick Prompt \u00b7 \uc77c\ubc18 \ub300\ud654 / \uc9e7\uc740 \uc9c8\ubb38\uc6a9"
+        : "CLI Project Prompt \u00b7 \uac01 CLI\uac00 workspace\ub97c \uc9c1\uc811 \uc77d\ub294 \uac1c\ubc1c\uc6a9",
       skills: "Off",
       memory: "Off",
-      session: "Off",
-      context: "CLI"
+      session: isQuickCli ? "Off" : "CLI",
+      context: isQuickCli ? "Quick Prompt" : "Project Prompt"
     };
   }
 
@@ -334,7 +372,7 @@ function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skil
     return {
       engine: "Local Model",
       tone: "gray",
-      detail: "\uB85C\uCEEC \u0065\u006e\u0064\u0070\u006f\u0069\u006e\u0074 \uAE30\uBC18 \uC2E4\uD589",
+      detail: "\ub85c\uceec endpoint \uae30\ubc18 \uc2e4\ud589",
       skills: "Off",
       memory: "Off",
       session: "Off",
@@ -346,11 +384,11 @@ function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skil
     return {
       engine: "Direct API",
       tone: "blue",
-      detail: "Quick\uC740 Hermes\uB97C \uAC70\uCE58\uC9C0 \uC54A\uACE0 API\uB85C \uC9C1\uC811 \uD638\uCD9C",
+      detail: "Direct API \u00b7 \uc77c\ubc18 \ub300\ud654 / \uac80\uc0c9 \uc694\uc57d\uc6a9 \u00b7 Minimal Context",
       skills: "Off",
       memory: "Off",
       session: "Off",
-      context: "Minimal"
+      context: "Minimal Context"
     };
   }
 
@@ -358,11 +396,11 @@ function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skil
     return {
       engine: "Hermes Agent",
       tone: "green",
-      detail: "\uCF54\uB4DC \uC791\uC5C5\uC6A9 \u00b7 \uD328\uCE58 \uC2B9\uC778 \uAD8C\uC7A5",
+      detail: "Hermes Optimized Context \u00b7 \ucf54\ub4dc \uc791\uc5c5 / \ud328\uce58 \uc2b9\uc778 \ud750\ub984 \uad8c\uc7a5",
       skills: hasSkills || hasToolsets ? "On" : "Recommended",
       memory: "On",
       session: "On",
-      context: "64K+"
+      context: "Optimized Context"
     };
   }
 
@@ -370,11 +408,11 @@ function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skil
     return {
       engine: "Hermes Review",
       tone: "orange",
-      detail: "\uAC80\uD1A0 \uC911\uC2EC \u00b7 \uD30C\uC77C \uC218\uC815 \uAE08\uC9C0 \uAD8C\uC7A5",
+      detail: "\ucf54\ub4dc \uac80\ud1a0 \uc911\uc2ec \u00b7 \ud30c\uc77c \uc218\uc815 \uc5c6\uc774 \uc77d\uae30 \uc6b0\uc120",
       skills: hasSkills || hasToolsets ? "On" : "Optional",
       memory: "Optional",
       session: "On",
-      context: "64K+"
+      context: "Review Context"
     };
   }
 
@@ -382,22 +420,22 @@ function getExecutionRouteInfo({ provider = "", executionProfile = "quick", skil
     return {
       engine: "Hermes Automation",
       tone: "orange",
-      detail: "Cron / Workflow / Gateway",
+      detail: "Cron / Workflow / Gateway \uc790\ub3d9\ud654\uc6a9",
       skills: hasSkills || hasToolsets ? "On" : "Required",
       memory: "On",
       session: "On",
-      context: "64K+"
+      context: "Automation"
     };
   }
 
   return {
     engine: "Hermes Agent",
     tone: "green",
-    detail: "\uBD84\uC11D / \uACC4\uD68D\uC6A9 Hermes Agent \uC2E4\uD589",
+    detail: "Hermes Optimized Context \u00b7 \ud30c\uc77c \ubd84\uc11d / \uc791\uc5c5 \uacc4\ud68d\uc6a9",
     skills: hasSkills || hasToolsets ? "On" : "Optional",
     memory: "On",
     session: "On",
-    context: "64K+"
+    context: "Optimized Context"
   };
 }
 
@@ -1316,11 +1354,17 @@ async function speakAssistantMessage(content) {
 
   function handleModelChange(nextModel) {
     const parsedAuthModel = parseAuthCliModelValue(nextModel);
+    const inferredProvider = inferProviderFromModelValue(nextModel, provider);
 
     setModel(nextModel);
 
-    if (parsedAuthModel) {
+    if (parsedAuthModel?.agentId) {
       setProvider(parsedAuthModel.agentId);
+      return;
+    }
+
+    if (inferredProvider && inferredProvider !== provider) {
+      setProvider(inferredProvider);
     }
   }
 
@@ -1384,7 +1428,10 @@ async function speakAssistantMessage(content) {
     abortRef.current = controller;
 
     const parsedAuthModelForRun = parseAuthCliModelValue(model);
-    const requestProvider = parsedAuthModelForRun ? parsedAuthModelForRun.agentId : provider;
+    const inferredProviderForRun = inferProviderFromModelValue(model, provider);
+    const requestProvider = parsedAuthModelForRun
+      ? parsedAuthModelForRun.agentId
+      : inferredProviderForRun || provider;
     const requestModelRaw = parsedAuthModelForRun ? parsedAuthModelForRun.modelId : model;
     const requestModel =
       ["codex-default", "claude-default", "gemini-default"].includes(requestModelRaw)
@@ -1997,13 +2044,13 @@ async function speakAssistantMessage(content) {
           }}
           title="응답 방식"
         >
-          <option value="quick:short">응답: Quick · 짧게</option>
-          <option value="quick:normal">응답: Quick · 보통</option>
-          <option value="quick:detailed">응답: Quick · 자세히</option>
-          <option value="agent:normal">응답: Agent · 분석</option>
-          <option value="coding:normal">응답: Coding · 코드작업</option>
-          <option value="review:detailed">응답: Review · 검토</option>
-          <option value="automation:normal">응답: Automation · 자동화</option>
+          <option value="quick:short">{"\uBE60\uB978 \uB300\uD654 \u00B7 \uC9E7\uAC8C"}</option>
+          <option value="quick:normal">{"\uBE60\uB978 \uB300\uD654 \u00B7 \uBCF4\uD1B5"}</option>
+          <option value="quick:detailed">{"\uBE60\uB978 \uB300\uD654 \u00B7 \uC790\uC138\uD788"}</option>
+          <option value="agent:normal">{"\uD30C\uC77C \uBD84\uC11D"}</option>
+          <option value="coding:normal">{"\uCF54\uB4DC \uC791\uC5C5"}</option>
+          <option value="review:detailed">{"\uCF54\uB4DC \uAC80\uD1A0"}</option>
+          <option value="automation:normal">{"\uC790\uB3D9\uD654"}</option>
         </select>
 
         <button
